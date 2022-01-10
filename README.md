@@ -4,7 +4,10 @@ This repository contains various SaltStack extension modules as well as formulas
 
 ## Prerequisites
 
-The formulas generally require you deploy the extension modules under [`extmods`](extmods/) to your SaltStack setup — they won't work otherwise.  You would generally deploy these extension modules under your file roots `states/_<module type>` to be accessible in minions.
+The formulas generally require you deploy the extension modules under [`extmods`](extmods/) to your SaltStack setup (master and minions) — they won't work otherwise:
+
+* You would generally deploy these extension modules under your file roots `states/_<module type>` to be accessible in minions, then synced to the minions using `salt '*' saltutil.sync_all`.
+* On the Salt master they would go under the `extmods` directory specified in your master's configuration, then synced into the master's cache using `salt-run saltutil.sync_all`.
 
 ## Formula list
 
