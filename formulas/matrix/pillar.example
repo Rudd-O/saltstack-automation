@@ -62,9 +62,15 @@ matrix:
     # metrics_flags:
     #   known_servers: true
 
-    # Caching metrics.
+    # Caching tweaks.
     # caches:
     #   global_factor: 0.1
+
+    # The shared secret used by the automation to register accounts,
+    # in lieu of an admin account that does not exist when the server
+    # is first set up.  You can disable this after production setup,
+    # as long as you control the admin account that the automation
+    # creates for you by default.
     registration_shared_secret: {{ registration_shared_secret | json }}
 
     # VoIP signaling (TURN/STUN) settings.
