@@ -6,6 +6,7 @@ import subprocess
 
 
 def qubes():
+    grains = {}
     with open(os.devnull, "w") as devnull:
         try:
             grains['vm_type'] = subprocess.check_output(['qubesdb-read', '/qubes-vm-type'], stderr=devnull).strip()
