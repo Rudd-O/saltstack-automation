@@ -1,3 +1,6 @@
+{# These are insecure defaults.  You must change when ready for production. #}
+{# WARNING: Never check in to any public repository the information on this file! #}
+
 {% set dbname = "synapse" %}
 {% set dbuser = "synapse" %}
 {% set dbpassword = "changeme" %}
