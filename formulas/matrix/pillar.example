@@ -11,6 +11,7 @@
 {% set accounts = [
      ["admin", "changeme", True],
      ["matrixer", "changeme", False],
+     ["tester", "changeme", False],
    ] %}
 
 matrix:
