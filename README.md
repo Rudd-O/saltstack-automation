@@ -11,7 +11,7 @@ The formulas generally require you deploy the extension modules under [`extmods`
 
 ## Formula list
 
-Formulas are under [formulas/](formulas/).  Here is an overview:
+Formulas are under [`formulas`](formulas/).  Here is an overview:
 
 * [Matrix](formulas/matrix/) helps you set up a self-contained federated Matrix Synapse instance with VoIP signaling support.  To learn more about how to use this formula, [see the guide](https://rudd-o.com/linux-and-free-software/matrix-in-a-box).
 
