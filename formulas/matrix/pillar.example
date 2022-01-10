@@ -7,7 +7,7 @@
 {% set registration_shared_secret = "CHANGEMECHANGEME000000CTUQEMloqpBTRSmCgObAP1sfEdTbgEGtJfAZquwBAe" %}
 {% set turn_auth_secret = "CHANGEMECHANGEME000000CTUQEMloqpBTRSmCgObAP1sfEdTbgEGtJfAZquwBAe" %}
 {% set server_name = "example.com" %}
-{% set delegated_hostname = "matrixtest.example.com" %}
+{% set delegated_hostname = "matrixtest." + server_name %}
 {% set accounts = [
      ["admin", "changeme", True],
      ["matrixer", "changeme", False],
