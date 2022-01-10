@@ -1,0 +1,114 @@
+{% set dbname = "synapse" %}
+{% set dbuser = "synapse" %}
+{% set dbpassword = "changeme" %}
+{% set registration_shared_secret = "CHANGEMECHANGEME000000CTUQEMloqpBTRSmCgObAP1sfEdTbgEGtJfAZquwBAe" %}
+{% set turn_auth_secret = "CHANGEMECHANGEME000000CTUQEMloqpBTRSmCgObAP1sfEdTbgEGtJfAZquwBAe" %}
+{% set server_name = "example.com" %}
+{% set delegated_hostname = "matrixtest.example.com" %}
+{% set accounts = [
+     ["admin", "changeme", True],
+     ["matrixer", "changeme", False],
+   ] %}
+
+matrix:
+  postgresql:
+    name: &dbname {{ dbname | json }}
+    user: &dbuser {{ dbuser | json }}
+    password: &dbpassword {{ dbpassword | json }}
+  ssl:
+    delegated_hostname: &delegated_hostname {{ delegated_hostname | json }}
+    renewal_email: changeme@{{ server_name }}
+
+  # VoIP signaling (TURN/STUN) settings.
+  # They must match what Synapse gets too.
+  coturn:
+    # Shared secret to negotiate temp accounts between Synapse and coturn.
+    static_auth_secret: &turn_auth_secret {{ turn_auth_secret | json }}
+
+    # Authentication realm.  Reasonable default.
+    realm: *delegated_hostname
+
+    # The following setting is useful if you are running behind NAT.
+    #
+    # get_external_ip_command: wget -q -O- https://yourdomain.com/get-client-ip.php
+    #
+    # But you can also set a fixed public static IP, if you know it and
+    # you also know it won't change.
+    #
+    # external_ip: 1.2.4.8
+
+  # What follows are Synapse settings.
+  # The full reference is in the config file homeserver.yaml.j2.
+  # Pillars don't govern /every/ homeserver setting, but the key ones
+  # are available to modify via pillar.
+  synapse:
+    # This is the domain name in the Matrix user name: @user:domain.com
+    server_name: {{ server_name | json }}
+
+    # This enables media repository.
+    enable_media_repo: true
+
+    # The following enables telemetry collection.
+    enable_metrics: true
+
+    # The following lets you up the upload size.
+    # This setting governs both Synapse's and NginX's max upload size.
+    # max_upload_size: 500M
+
+    # The following collects metrics on known servers.
+    # metrics_flags:
+    #   known_servers: true
+
+    # Caching metrics.
+    # caches:
+    #   global_factor: 0.1
+    registration_shared_secret: {{ registration_shared_secret | json }}
+
+    # VoIP signaling (TURN/STUN) settings.
+    # The following gives reasonable defaults.
+    turn_uris:
+{% for transport in ['udp', 'tcp'] %}
+{%   for proto, port in [('stun', 3478), ('turns', 5349), ('turn', 3478)] %}
+    - {{ proto }}:{{ delegated_hostname }}:{{ port }}?transport={{ transport }}
+{%   endfor %}
+{% endfor %}
+    # Shared secret to negotiate temp accounts between Synapse and coturn.
+    turn_shared_secret: *turn_auth_secret
+
+    # Database settings.  They must match the postgresql settings.
+    database:
+      name: psycopg2
+      args:
+        database: *dbname
+        user: *dbuser
+        password: *dbpassword
+        host: localhost
+        cp_min: 3
+        cp_max: 8
+
+    # TCP / HTTP listeners to activate when Synapse starts.
+    listeners:
+    # This listener serves the Matrix API, and will be reverse-proxied by NginX.
+    - port: 8008
+      tls: false
+      type: http
+      x_forwarded: false
+      bind_addresses: ["127.0.0.1"]
+      resources:
+      - names: ["client", "federation"]
+        compress: false
+    # The following listener gives you Prometheus metrics.
+    - port: 9008
+      tls: false
+      type: metrics
+      bind_addresses: ["0.0.0.0"]
+
+  # The automation will create the following user accounts for you.
+  accounts:
+{% for user, password, admin in accounts %}
+  - user: {{ user | json }}
+    password: {{ password | json }}
+{%   if admin %}
+    admin: true
+{%   endif %}
+{% endfor %}
