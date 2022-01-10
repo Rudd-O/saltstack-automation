@@ -39,6 +39,8 @@ matrix:
     # you also know it won't change.
     #
     # external_ip: 1.2.4.8
+    #
+    # The two settings in this commented block are mutually exclusive.
 
   # What follows are Synapse settings.
   # The full reference is in the config file homeserver.yaml.j2.
