@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# This program determines if the external IP of the coturn server has changed,
+# by using a command line found in the (commented) config option named
+# get_external_ip_command in the /etc/coturn/turnserver.conf config file.
+# The command is supposed to return the current external IP of the machine.
+#
+# If it turns out that the external IP has changed, then it will replace the
+# old IP on the config file with the new IP, and restart coturn.
+
+command=$(cat /etc/coturn/turnserver.conf | grep '^# get_external_ip_command=' | sed 's/^# get_external_ip_command=//')
+
+set -e
+set -o pipefail
+
+if [ "$command" == "" ] ; then
+    # Nothing to do.
+    exit
+fi
+
+tmpf=`mktemp`
+function finish {
+    rm -rf "$tmpf"
+}
+trap finish EXIT
+
+external_ip=$($command | head -n 1) || {
+    ret=$?
+    echo "The external command $command failed to return data.  Cannot reconfigure coturn." >&2
+    exit $ret
+}
+
+cat /etc/coturn/turnserver.conf > "$tmpf"
+sed -i "s|^external_ip=.*|external_ip=$external_ip|" "$tmpf"
+if cmp -s "$tmpf" /etc/coturn/turnserver.conf ; then
+    # No changes.  Nothing to do.
+    exit
+fi
+
+cat "$tmpf" > /etc/coturn/turnserver.conf
+systemctl --system restart coturn.service

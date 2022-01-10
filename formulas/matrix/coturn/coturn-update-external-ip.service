@@ -1,0 +1,10 @@
+[Unit]
+Description=Update external IP in coturn configuration
+Before=coturn.service
+
+[Service]
+ExecStart=/usr/bin/coturn-update-external-ip
+Type=simple
+
+[Install]
+RequiredBy=coturn.service

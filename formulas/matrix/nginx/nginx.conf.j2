@@ -1,0 +1,88 @@
+# This file is a combination between the default Fedora
+# configuration and the Matrix configuration readable at
+# https://github.com/matrix-org/synapse/blob/develop/docs/reverse_proxy.md#nginx .
+ 
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log;
+pid /run/nginx.pid;
+
+# Load dynamic modules. See /usr/share/doc/nginx/README.dynamic.
+include /usr/share/nginx/modules/*.conf;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log  /var/log/nginx/access.log  main;
+
+    sendfile            on;
+    tcp_nopush          on;
+    tcp_nodelay         on;
+    keepalive_timeout   65;
+    types_hash_max_size 4096;
+
+    include             /etc/nginx/mime.types;
+    default_type        application/octet-stream;
+
+    server {
+        listen 80;
+        listen [::]:80;
+
+        server_name {{ delegated_hostname }};
+
+        location / {
+            return 301 https://$host$request_uri;
+        }
+
+        location /.well-known/acme-challenge {
+            # used to get certbot to complete the HTTP challenge 
+            root {{ certbot_webroot }};
+        }
+    }
+
+{% if ssl_certificate is defined and ssl_certificate_key is defined %}
+
+    server {
+        listen 443 ssl http2;
+        listen [::]:443 ssl http2;
+
+        ssl_certificate "{{ ssl_certificate }}";
+        ssl_certificate_key "{{ ssl_certificate_key }}";
+        ssl_session_cache shared:SSL:1m;
+        ssl_session_timeout 10m;
+        ssl_ciphers PROFILE=SYSTEM;
+        ssl_prefer_server_ciphers on;
+
+        add_header Strict-Transport-Security "max-age=63072000; preload" always;
+
+        # For the federation port
+        listen 8448 ssl http2 default_server;
+        listen [::]:8448 ssl http2 default_server;
+
+        server_name {{ delegated_hostname }};
+
+        location ~ ^(/_matrix|/_synapse/(client|admin)) {
+            # note: do not add a path (even a single /) after the port in `proxy_pass`,
+            # otherwise nginx will canonicalise the URI and cause signature verification
+            # errors.
+            # DO NOT USE LOCALHOST, always use an IP address.
+            proxy_pass http://127.0.0.1:8008;
+            proxy_set_header X-Forwarded-For $remote_addr;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Host $host;
+
+            # Nginx by default only allows file uploads up to 1M in size
+            # Increase client_max_body_size to match max_upload_size defined in homeserver.yaml
+            client_max_body_size {{ max_upload_size }};
+        }
+    }
+
+{% endif %}
+
+}
