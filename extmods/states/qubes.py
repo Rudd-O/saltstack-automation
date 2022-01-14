@@ -21,8 +21,11 @@ def _mimic(tgtdict, srcdict):
     return tgtdict
 
 
-def _fish(singlestate_ret):
-    return list(singlestate_ret.values())[0]
+def _single(subname, *args, **kwargs):
+    ret = __salt__["state.single"](*args, **kwargs)
+    ret = list(singlestate_ret.values())[0]
+    ret["name"] = subname
+    return ret
 
 
 def bind_dirs(name, directories):
@@ -67,41 +70,40 @@ def bind_dirs(name, directories):
     except AssertionError as e:
         return _mimic(ret, {"comment": str(e)})
 
-    ret1 = _fish(
-        __salt__["state.single"](
-            "file.directory",
-            name="/rw/config/qubes-bind-dirs.d",
-            mode="0755",
-            user="root",
-            group="root",
-        )
+    ret1 = _single(
+        "bind-dirs directory",
+        "file.directory",
+        name="/rw/config/qubes-bind-dirs.d",
+        mode="0755",
+        user="root",
+        group="root",
     )
+
     if ret1["result"] is False:
         return _mimic(ret, ret1)
 
     name = name + ".conf"
     id_ = "/rw/config/qubes-bind-dirs.d/%s" % name
     c = "\n".join("binds+=( %s )" % quote(d) for d in directories)
-    ret2 = _fish(
-        __salt__["state.single"](
-            "file.managed",
-            name=id_,
-            mode="0644",
-            user="root",
-            group="root",
-            contents=c,
-        )
+    ret2 = _single(
+        "bind-dirs file",
+        "file.managed",
+        name=id_,
+        mode="0644",
+        user="root",
+        group="root",
+        contents=c,
     )
+
     if ret2["result"] is False:
         return _mimic(ret, ret2)
 
     if ret2["changes"] or any(not os.path.ismount(d) for d in directories):
-        ret3 = _fish(
-            __salt__["state.single"](
-                "cmd.run",
-                name="/usr/lib/qubes/init/bind-dirs.sh",
-            )
+        ret3 = _single(
+            "bind-dirs.sh" "cmd.run",
+            name="/usr/lib/qubes/init/bind-dirs.sh",
         )
+
         if ret3["result"] is False:
             return _mimic(ret, ret3)
     else:
@@ -111,13 +113,17 @@ def bind_dirs(name, directories):
         ret,
         {
             "result": ret3["result"],
-            "comment": "\n".join([ret1["comment"], ret2["comment"], ret3["comment"]]),
-            "changes": {**ret1["changes"], **ret2["changes"], **ret3["changes"]},
+            "comment": "\n".join([r["comment"] for r in [ret1, ret2, ret3]]),
+            "changes": dict(
+                (r["name"], r["changes"]) for r in [ret1, ret2, ret3] if r["changes"]
+            ),
         },
     )
 
 
-def enable_dom0_managed_service(name, scope="system", qubes_service_name=None, enable=True):
+def enable_dom0_managed_service(
+    name, scope="system", qubes_service_name=None, enable=True
+):
     """
     Mark a systemd service as managed by Qubes OS, and enable the
     service.  In other words, if the service is not enabled through
@@ -139,29 +145,32 @@ def enable_dom0_managed_service(name, scope="system", qubes_service_name=None, e
     ret = dict(name=name, result=False, changes={}, comment="")
 
     if enable:
-        ret1 = _fish(
-            __salt__["state.single"](
-                'service.enabled',
-                name=name,
-            )
+        ret1 = _single(
+            "enable service",
+            "service.enabled",
+            name=name,
         )
+
         if ret1["result"] is False:
             return ret1
     else:
-        ret1 = dict(name=name, result=True, changes={}, comment="Service explicitly not enabled")
-
-    ret2 = _fish(
-        __salt__["state.single"](
-            'file.managed',
-            name="/etc/systemd/%s/%s.service.d/qubes.conf" % (scope, name),
-            contents="""[Unit]
-ConditionPathExists=/var/run/qubes-service/%s
-""" % qubes_service_name,
-            user="root",
-            group="root",
-            mode="0644",
+        ret1 = dict(
+            name=name, result=True, changes={}, comment="Service explicitly not enabled"
         )
+
+    ret2 = _single(
+        "qubify service",
+        "file.managed",
+        name="/etc/systemd/%s/%s.service.d/qubes.conf" % (scope, name),
+        contents="""[Unit]
+ConditionPathExists=/var/run/qubes-service/%s
+"""
+        % qubes_service_name,
+        user="root",
+        group="root",
+        mode="0644",
     )
+
     if ret2["result"] is False:
         return ret2
 
@@ -170,6 +179,8 @@ ConditionPathExists=/var/run/qubes-service/%s
         {
             "result": ret2["result"],
             "comment": "\n".join([ret1["comment"], ret2["comment"]]),
-            "changes": {**ret1["changes"], **ret2["changes"]},
+            "changes": dict(
+                (r["name"], r["changes"]) for r in [ret1, ret2] if r["changes"]
+            ),
         },
     )
