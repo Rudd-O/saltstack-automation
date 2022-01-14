@@ -23,7 +23,7 @@ def _mimic(tgtdict, srcdict):
 
 def _single(subname, *args, **kwargs):
     ret = __salt__["state.single"](*args, **kwargs)
-    ret = list(singlestate_ret.values())[0]
+    ret = list(ret.values())[0]
     ret["name"] = subname
     return ret
 
