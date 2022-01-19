@@ -77,7 +77,18 @@ matrix:
     registration_shared_secret: {{ registration_shared_secret | json }}
 
     # VoIP signaling (TURN/STUN) settings.
-    # The following gives reasonable defaults.
+    # The following settings give reasonable defaults.
+    #
+    # Testing TURN/STUN.
+    #
+    # This URL https://test.voip.librepush.net/ lets you test that
+    # your home server TURN/STUN service is working alright with the
+    # configuration specified below.  You will need to specify your
+    # full homeserver URL, and a tester account's username/password
+    # to be able to run the tester.
+    #
+    # Now for the settings:
+
     turn_uris:
 {% for transport in ['udp', 'tcp'] %}
 {%   for proto, port in [('stun', 3478), ('turns', 5349)] %}
