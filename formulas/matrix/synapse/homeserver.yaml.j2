@@ -22,6 +22,30 @@
 # For example, setting redaction_retention_period: 5m would remove redacted
 # messages from the database after 5 minutes, rather than 5 months.
 
+{% if not default_ip_range_blacklist is defined -%}
+{% load_yaml as default_ip_range_blacklist -%}
+- '127.0.0.0/8'
+- '10.0.0.0/8'
+- '172.16.0.0/12'
+- '192.168.0.0/16'
+- '100.64.0.0/10'
+- '192.0.0.0/24'
+- '169.254.0.0/16'
+- '192.88.99.0/24'
+- '198.18.0.0/15'
+- '192.0.2.0/24'
+- '198.51.100.0/24'
+- '203.0.113.0/24'
+- '224.0.0.0/4'
+- '::1/128'
+- 'fe80::/10'
+- 'fc00::/7'
+- '2001:db8::/32'
+- 'ff00::/8'
+- 'fec0::/10'
+{% endload -%}
+{% endif -%}
+
 ################################################################################
 
 # Configuration file for Synapse.
@@ -222,6 +246,12 @@ default_room_version: {{ ( (default_room_version | default("6")) | string ) | js
 #
 # Note: The value is ignored when an HTTP proxy is in use
 #
+{% if ip_range_blacklist is not defined -%}
+{%   set ip_range_blacklist = default_ip_range_blacklist -%}
+{% endif -%}
+{% if ip_range_blacklist is defined -%}
+ip_range_blacklist: {{ ip_range_blacklist | json -}}
+{% endif -%}
 #ip_range_blacklist:
 #  - '127.0.0.0/8'
 #  - '10.0.0.0/8'
@@ -1029,7 +1059,7 @@ max_image_pixels: {{ ( max_image_pixels | default("32M") ) | json }}
 # 'false' by default: uncomment the following to enable it (and specify a
 # url_preview_ip_range_blacklist blacklist).
 #
-#url_preview_enabled: true
+url_preview_enabled: {{ ( url_preview_enabled | default(False) ) | json }}
 
 # List of IP address CIDR ranges that the URL preview spider is denied
 # from accessing.  There are no defaults: you must explicitly
@@ -1047,6 +1077,14 @@ max_image_pixels: {{ ( max_image_pixels | default("32M") ) | json }}
 #
 # Note: The value is ignored when an HTTP proxy is in use
 #
+{% if url_preview_enabled is defined
+      and url_preview_enabled
+      and not url_preview_ip_range_blacklist is defined -%}
+{%   set url_preview_ip_range_blacklist = default_ip_range_blacklist -%}
+{% endif -%}
+{% if url_preview_ip_range_blacklist is defined -%}
+url_preview_ip_range_blacklist: {{ url_preview_ip_range_blacklist | json -}}
+{% endif -%} 
 #url_preview_ip_range_blacklist:
 #  - '127.0.0.0/8'
 #  - '10.0.0.0/8'
@@ -1074,6 +1112,9 @@ max_image_pixels: {{ ( max_image_pixels | default("32M") ) | json }}
 # target IP ranges - e.g. for enabling URL previews for a specific private
 # website only visible in your network.
 #
+{% if url_preview_ip_range_whitelist is defined -%}
+url_preview_ip_range_whitelist: {{ url_preview_ip_range_whitelist | json -}}
+{% endif -%} 
 #url_preview_ip_range_whitelist:
 #   - '192.168.1.1'
 
@@ -1093,6 +1134,9 @@ max_image_pixels: {{ ( max_image_pixels | default("32M") ) | json }}
 # specified component matches for a given list item succeed, the URL is
 # blacklisted.
 #
+{% if url_preview_url_blacklist is defined -%}
+url_preview_url_blacklist: {{ url_preview_url_blacklist | json -}}
+{% endif -%} 
 #url_preview_url_blacklist:
 #  # blacklist any URL with a username in its URI
 #  - username: '*'
@@ -1113,6 +1157,9 @@ max_image_pixels: {{ ( max_image_pixels | default("32M") ) | json }}
 
 # The largest allowed URL preview spidering size in bytes
 #
+{% if max_spider_size is defined -%}
+max_spider_size: {{ max_spider_size | json -}}
+{% endif -%}
 #max_spider_size: 10M
 
 # A list of values for the Accept-Language HTTP header used when

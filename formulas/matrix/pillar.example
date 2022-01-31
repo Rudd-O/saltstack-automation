@@ -54,6 +54,9 @@ matrix:
     # This enables media repository.
     enable_media_repo: true
 
+    # Enable media previews.
+    # url_preview_enabled: true
+
     # The following enables telemetry collection.
     enable_metrics: true
 

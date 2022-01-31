@@ -11,9 +11,11 @@ if fully_persistent_or_physical():
         Qubes.enable_dom0_managed_service("synapse")
     Pkg.installed("python3-systemd")
     Pkg.installed("python3-psycopg2")
+    Pkg.installed("python3-lxml") # Needed for URL previews.
     deps = [
         Pkg("python3-systemd"),
         Pkg("python3-psycopg2"),
+        Pkg("python3-lxml"),
         Qubes("synapse"),
     ]
 else:
