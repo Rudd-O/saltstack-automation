@@ -47,7 +47,7 @@ def present(name, image, options=None, enable=False):
     for option in options:
         for key, value in option.items():
             key = "-" + key if len(key) < 2 else "--" + key
-            cmd.extend([key, value])
+            cmd.extend([key + "=" + value])
     cmd += [image]
 
     rets = []
