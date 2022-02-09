@@ -24,6 +24,12 @@ def _single(subname, *args, **kwargs):
     return ret
 
 
+def _escape_unit(name):
+    if not name.endswith(".service"):
+        name += ".service"
+    return co(["systemd-escape", "-m", "--", name], text=True).rstrip()
+
+
 def present(name, image, options=None, dryrun=False, enable=None):
     """
     Creates a container with a name, and runs it under systemd.
@@ -84,7 +90,7 @@ def present(name, image, options=None, dryrun=False, enable=None):
         r["result"] != False for r in rets
     )
 
-    escaped_name = "container-" + co(["systemd-escape", name], text=True).rstrip()
+    escaped_name = "container-" + _escape_unit(name)[:-8]
     unit_path = "/etc/systemd/system/%s.service" % escaped_name
 
     if container_exists:
@@ -189,9 +195,7 @@ def dead(name):
         r["result"] != False for r in rets
     )
 
-    escaped_name = (
-        "container-" + co(["systemd-escape", "-m", "--", name], text=True).rstrip()
-    )
+    escaped_name = "container-" + _escape_unit(name)[:-8]
     unit_path = "/etc/systemd/system/%s.service" % escaped_name
 
     if container_exists:
