@@ -24,10 +24,13 @@ def _single(subname, *args, **kwargs):
     return ret
 
 
-def present(name, image, options=None, enable=False):
+def present(name, image, options=None, dryrun=False, enable=None):
     """
-    Creates a container with a name.
-    See https://www.qubes-os.org/doc/bind-dirs/ for more information.
+    Creates a container with a name, and runs it under systemd.
+
+    If dryrun is specified, the existing properties of the
+    container are checked, and changes are returned accordingly
+    without making any changes.
     """
     options = options or []
 
@@ -43,20 +46,58 @@ def present(name, image, options=None, enable=False):
         existing_cmd = []
         container_exists = False
 
-    cmd = ["podman", "run", "-d", "--name", name]
+    cmd = ["podman", "container", "create", "--name", name]
     for option in options:
-        for key, value in option.items():
-            key = "-" + key if len(key) < 2 else "--" + key
-            cmd.extend([key + "=" + value])
+        if hasattr(option, "items"):
+            for key, value in option.items():
+                key = "-" + key if len(key) < 2 else "--" + key
+                cmd.extend([key + "=" + value])
+        else:
+            option = "-" + option if len(option) < 2 else "--" + option
+            cmd.extend([option])
     cmd += [image]
+
+    if dryrun:
+        if not container_exists:
+            return {
+                "name": name,
+                "comment": "Container %s would be created" % name,
+                "changes": {"container create": name},
+                "result": None if not __opts__["test"] else True,
+            }
+        if cmd != existing_cmd:
+            return {
+                "name": name,
+                "comment": "Container %s would be recreated" % name,
+                "changes": {"container recreate": name},
+                "result": None if not __opts__["test"] else True,
+            }
+        return {
+            "name": name,
+            "comment": "Container %s needs no changes" % name,
+            "changes": {},
+            "result": True,
+        }
 
     rets = []
     a, success = rets.append, lambda: not rets or all(
         r["result"] != False for r in rets
     )
 
+    escaped_name = "container-" + co(["systemd-escape", name], text=True).rstrip()
+    unit_path = "/etc/systemd/system/%s.service" % escaped_name
+
     if container_exists:
         if cmd != existing_cmd:
+            if os.path.exists(unit_path):
+                a(
+                    _single(
+                        "Old systemd service stop",
+                        "service.dead",
+                        name=escaped_name,
+                    )
+                )
+
             for subcmd in "stop rm".split():
                 if success():
                     a(
@@ -71,7 +112,7 @@ def present(name, image, options=None, enable=False):
             if success():
                 a(
                     _single(
-                        "Container new start",
+                        "Container new",
                         "cmd.run",
                         name=" ".join(quote(x) for x in cmd),
                     )
@@ -79,7 +120,7 @@ def present(name, image, options=None, enable=False):
         else:
             a(
                 dict(
-                    name="Container start",
+                    name="Container create",
                     result=True,
                     comment="Container %s already running with matching parameters"
                     % name,
@@ -96,29 +137,84 @@ def present(name, image, options=None, enable=False):
                 )
             )
 
-    if not __opts__["test"] and enable and success():
-        unit, escaped_name = (
-            co("podman generate systemd --no-header".split() + [name], text=True),
-            co(["systemd-escape", name], text=True).rstrip(),
-        )
+    if success():
+        unit = co("podman generate systemd --no-header".split() + [name], text=True)
 
         a(
             _single(
                 "systemd service creation",
                 "file.managed",
-                name="/etc/systemd/system/container-%s.service" % escaped_name,
+                name=unit_path,
                 contents=unit,
             )
         )
 
         if success():
+            if rets[-1]["changes"]:
+                # Reload systemd because we changed the unit file.
+                if not __opts__["test"]:
+                    co(["systemctl", "--system", "daemon-reload"])
             a(
                 _single(
                     "systemd service enablement",
-                    "service.enabled",
-                    name="container-%s" % escaped_name,
+                    "service.running",
+                    enable=enable,
+                    name=escaped_name,
                 )
             )
+
+    return dict(
+        name=name,
+        result=success(),
+        comment="\n".join(r["comment"] for r in rets),
+        changes=dict((r["name"], r["changes"]) for r in rets if r["changes"]),
+    )
+
+
+def dead(name):
+    """
+    Stops a container by name.
+    """
+    try:
+        o = co(["podman", "container", "inspect", name])
+        container_exists = True
+        v = json.loads(o)
+        is_running = v[0]["State"]["Running"]
+    except CalledProcessError:
+        container_exists = False
+        is_running = False
+
+    rets = []
+    a, success = rets.append, lambda: not rets or all(
+        r["result"] != False for r in rets
+    )
+
+    escaped_name = (
+        "container-" + co(["systemd-escape", "-m", "--", name], text=True).rstrip()
+    )
+    unit_path = "/etc/systemd/system/%s.service" % escaped_name
+
+    if container_exists:
+        if os.path.exists(unit_path):
+            a(
+                _single(
+                    "Old systemd service stop",
+                    "service.dead",
+                    name=escaped_name,
+                )
+            )
+        if is_running:
+            for subcmd in "stop".split():
+                if success():
+                    a(
+                        _single(
+                            "Container %s" % subcmd,
+                            "cmd.run",
+                            name=" ".join(
+                                quote(x) for x in ["podman", "container", subcmd, name]
+                            ),
+                        )
+                    )
 
     return dict(
         name=name,
