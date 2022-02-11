@@ -12,7 +12,7 @@ include:
 {% endif %}
 
 
-{% set context = pillar.plone.buildout %}{# FIXME change var. #}
+{% set context = pillar.plone.container %}
 {% set data_basedir = context.get("directories", {}).get("datadir", "/srv/plone") %}
 
 
