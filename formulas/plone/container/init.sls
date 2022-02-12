@@ -81,6 +81,7 @@ system requirements:
 {%   else %}{# deployment_data.delete #}
 
 {%     set port = deployment_data.base_port + (loop.index0 * 2) %}
+{%     set listen_addr = deployment_data.listen_addr | default ("127.0.5.1") %}
 {%     set datadir = data_basedir + "/" + deployment_name %}
 {%     set options = [
          {"tls-verify": "false"},
@@ -88,12 +89,12 @@ system requirements:
          {"subuidname": context.users.process},
        ] %}
 {%     set options_blue = options + [
-         {"p": "127.0.5.1:" + ((port + 1)|string) + ":8080"},
+         {"p": listen_addr + ":" + ((port + 1)|string) + ":8080"},
          {"v": datadir + "-blue/filestorage:/data/filestorage:rw,Z,shared,U"},
          {"v": datadir + "-blue/blobstorage:/data/blobstorage:rw,Z,shared,U"},
        ] %}
 {%     set options_green = options + [
-         {"p": "127.0.5.1:" + ((port)|string) + ":8080"},
+         {"p": listen_addr + ":" + ((port)|string) + ":8080"},
          {"v": datadir + "-green/filestorage:/data/filestorage:rw,Z,shared,U"},
          {"v": datadir + "-green/blobstorage:/data/blobstorage:rw,Z,shared,U"},
        ] %}
