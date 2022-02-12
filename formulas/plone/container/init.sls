@@ -32,6 +32,7 @@ plone-deps:
   - name: {{ user }}
   user.present:
   - name: {{ user }}
+  - gid: {{ user }}
 {%   if not salt.user.info(user) %}{# Don't set home if already exists. #}
   - home: {{ home }}
 {%   endif %}
