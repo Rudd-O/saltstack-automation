@@ -32,17 +32,17 @@ if rw_only_or_physical():
             repl="host    %s         %s         %s            scram-sha-256" % (context["name"], context["user"], src),
             prepend_if_not_found=True,
             require=[Cmd("postgresql-setup --initdb")],
-            watch_in=[Service("postgresql")],
+            watch_in=[Service("postgresql-reloaded")],
         )
     Service.running(
         "postgresql-reloaded",
         name="postgresql",
         reload=True,
-        require_in=[Service("postgresql")],
     )
     Service.running(
         "postgresql",
         enable=True,
+        require=[Service("postgresql-reloaded")],
         require_in=[Test("Synapse database environment not yet defined")],
     )
     include(".dataenv")
