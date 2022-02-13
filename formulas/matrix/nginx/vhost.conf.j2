@@ -1,0 +1,28 @@
+{%- if ssl_certificate is defined and ssl_certificate_key is defined %}
+{%-   if not ports is defined %}{% set ports = [443] %}{% endif %}
+
+    server {
+        ssl_certificate "{{ ssl_certificate }}";
+        ssl_certificate_key "{{ ssl_certificate_key }}";
+        ssl_session_cache shared:SSL:1m;
+        ssl_session_timeout 10m;
+        ssl_ciphers PROFILE=SYSTEM;
+        ssl_prefer_server_ciphers on;
+
+        add_header Strict-Transport-Security "max-age=63072000; preload" always;
+
+{%-     for port in ports %}
+        listen {{ port }} ssl http2;
+        listen [::]:{{ port }} ssl http2;
+{%-     endfor %}
+
+        server_name {{ delegated_hostname }};
+
+        # Nginx by default only allows file uploads up to 1M in size
+        # Increase client_max_body_size to match max_upload_size defined in homeserver.yaml
+        client_max_body_size {{ max_upload_size|default("50M") }};
+
+        {{ server_config | default("") }}
+    }
+
+{%- endif %}

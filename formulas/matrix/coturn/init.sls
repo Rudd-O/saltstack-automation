@@ -4,6 +4,10 @@ import os
 
 
 from salt://lib/qubes.sls import rw_only_or_physical, fully_persistent_or_physical
+from salt://lib/letsencrypt.sls import privkey_path, fullchain_path, certificate_dir
+
+
+include("letsencrypt")
 
 
 if fully_persistent_or_physical():
@@ -46,11 +50,10 @@ else:
 
 if rw_only_or_physical():
     context = pillar("matrix:coturn", {})
-    ssl = pillar("matrix:ssl", {})
-    delegated_hostname = ssl["delegated_hostname"]
-    cert_dir = os.path.join("/etc/letsencrypt/live", delegated_hostname)
-    cert = os.path.join(cert_dir, "fullchain.pem")
-    key = os.path.join(cert_dir, "privkey.pem")
+    realm = context["realm"]
+    cert_dir = certificate_dir(realm)
+    cert = fullchain_path(realm)
+    key = privkey_path(realm)
     context["cert"] = cert
     context["key"] = key
     Qubes.bind_dirs(
@@ -101,7 +104,8 @@ if rw_only_or_physical():
             "getfacl %s | grep -q user:coturn:" % salt.text.quote(cert_dir),
             "getfacl /etc/letsencrypt/live | grep -q user:coturn:",
             "getfacl /etc/letsencrypt/archive | grep -q user:coturn:",
-        ])
+        ]),
+        require=[Test("all certificates generated")],
     )
     Service.running(
         "coturn",
@@ -120,7 +124,7 @@ systemctl restart coturn.service
         """.strip(),
         mode="0755",
         require=[
-            Cmd("Set coturn ACL for certificates"),
+            Service("coturn"),
         ],
         makedirs=True,
     )

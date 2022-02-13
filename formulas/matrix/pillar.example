@@ -14,14 +14,17 @@
      ["tester", "changeme", False],
    ] %}
 
+letsencrypt
+  renewal_email: changeme@{{ server_name }}
+  hosts:
+    {{ delegated_hostname | json }}: {}
+
 matrix:
   postgresql:
     name: &dbname {{ dbname | json }}
     user: &dbuser {{ dbuser | json }}
     password: &dbpassword {{ dbpassword | json }}
   ssl:
-    delegated_hostname: &delegated_hostname {{ delegated_hostname | json }}
-    renewal_email: changeme@{{ server_name }}
 
   # VoIP signaling (TURN/STUN) settings.
   # They must match what Synapse gets too.
@@ -30,7 +33,7 @@ matrix:
     static_auth_secret: &turn_auth_secret {{ turn_auth_secret | json }}
 
     # Authentication realm.  Reasonable default.
-    realm: *delegated_hostname
+    realm: {{ delegated_hostname | json }}
 
     # The following setting is useful if you are running behind NAT.
     #
@@ -50,6 +53,9 @@ matrix:
   synapse:
     # This is the domain name in the Matrix user name: @user:domain.com
     server_name: {{ server_name | json }}
+
+    # This is the host name of the server, according to the SSL certificate.
+    delegated_hostname: {{ delegated_hostname | json }}
 
     # This enables media repository.
     enable_media_repo: true

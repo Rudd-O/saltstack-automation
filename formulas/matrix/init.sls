@@ -1,7 +1,6 @@
 include:
 - .postgresql
 - .synapse
-- .ssl
 - .nginx
 - .accounts
 - .coturn
@@ -17,13 +16,6 @@ extend:
     test:
     - require:
       - service: synapse
-      - service: nginx after obtaining SSL certificate
-  Set coturn ACL for certificates:
-    cmd:
-    - require:
-      - cmd: generate certificate
-  /etc/letsencrypt/renewal-hooks/post/coturn:
-    file:
-    - require:
-      - cmd: generate certificate
+      - service: nginx
+
 {% endif %}
