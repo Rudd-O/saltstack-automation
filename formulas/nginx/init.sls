@@ -32,6 +32,7 @@ if rw_only_or_physical():
 
     Service.running(
         "nginx running in HTTP-only mode",
+        name="nginx",
         watch=[
             File("/etc/nginx/nginx.conf"),
         ],
