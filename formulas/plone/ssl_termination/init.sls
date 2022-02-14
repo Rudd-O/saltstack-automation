@@ -42,6 +42,10 @@ if rw_only_or_physical():
                     proxy_set_header X-Forwarded-Proto $scheme;
                     proxy_set_header Host $host;
                     proxy_pass http://%(backend)s;
+                    # WebSockets.
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade $http_upgrade;
+                    proxy_set_header Connection $connection_upgrade;
                 }
             """ % locals(),
         },

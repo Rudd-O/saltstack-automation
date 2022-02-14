@@ -45,6 +45,10 @@ if rw_only_or_physical():
                     proxy_set_header X-Forwarded-For $remote_addr;
                     proxy_set_header X-Forwarded-Proto $scheme;
                     proxy_set_header Host $host;
+                    # WebSockets.
+                    proxy_http_version 1.1;
+                    proxy_set_header Upgrade $http_upgrade;
+                    proxy_set_header Connection $connection_upgrade;
                 }
             """ % {"backend": "127.0.0.1:8008"},
         },
