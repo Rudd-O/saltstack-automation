@@ -3,7 +3,7 @@
 import os
 
 
-from salt://lib/qubes.sls import rw_only_or_physical
+from salt://lib/qubes.sls import rw_only_or_physical, physical
 from salt://lib/letsencrypt.sls import privkey_path, fullchain_path
 
 include("nginx")
@@ -15,6 +15,13 @@ if rw_only_or_physical():
     delegated_hostname = synapse["delegated_hostname"]
     cert = fullchain_path(delegated_hostname)
     key = privkey_path(delegated_hostname)
+
+    if physical():
+        Selinux.boolean(
+            "httpd_can_network_relay",
+            value=True,
+            require_in=[Service("nginx")],
+        )
 
     File.managed(
         "/etc/nginx/conf.d/vhosts/%s.conf" % delegated_hostname,
