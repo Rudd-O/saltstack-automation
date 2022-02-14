@@ -3,7 +3,7 @@
 import os
 
 
-from salt://lib/qubes.sls import rw_only_or_physical, fully_persistent_or_physical
+from salt://lib/qubes.sls import rw_only_or_physical
 from salt://lib/letsencrypt.sls import privkey_path, fullchain_path
 
 include("nginx")
@@ -19,12 +19,12 @@ if rw_only_or_physical():
     File.managed(
         "/etc/nginx/conf.d/vhosts/%s.conf" % delegated_hostname,
         name="/etc/nginx/conf.d/vhosts/%s.conf" % delegated_hostname,
-        source="salt://matrix/nginx/vhost.conf.j2",
+        source="salt://nginx/vhost.conf.j2",
         template="jinja",
         makedirs=True,
         context={
             "ports": [443, 8448],
-            "delegated_hostname": delegated_hostname,
+            "server_name": delegated_hostname,
             "max_upload_size": synapse.get("max_upload_size", "50M"),
             "ssl_certificate": cert,
             "ssl_certificate_key": key,

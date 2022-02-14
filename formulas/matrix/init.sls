@@ -1,7 +1,7 @@
 include:
 - .postgresql
 - .synapse
-- .nginx
+- .ssl_termination
 - .accounts
 - .coturn
 
