@@ -68,6 +68,7 @@ system requirements:
 {% for deployment_name, deployment_data in context.deployments.items()
      if deployment_name in limit_to %}
 
+{%   set datadir = data_basedir + "/" + deployment_name %}
 {%   set quoted_deployment_name = salt.text.quote(deployment_name) %}
 
 {%   if deployment_data.delete | default(False) %}
@@ -79,17 +80,20 @@ remove from load balancer deployment {{ deployment_name }}:
   - require:
     - file: /usr/local/bin/varnish-set-backend
 
-remove plone-{{ deployment_name }}-blue:
+{%     for color in ["blue", "green"] %}
+
+remove plone-{{ deployment_name }}-{{ color }}:
   podman.absent:
-  - name: plone-{{ deployment_name }}-blue
+  - name: plone-{{ deployment_name }}-{{ color }}
   - require:
     - cmd: remove from load balancer deployment {{ deployment_name }}
 
-remove plone-{{ deployment_name }}-green:
-  podman.absent:
-  - name: plone-{{ deployment_name }}-green
+{{ datadir }}-{{ color }}:
+  file.absent:
   - require:
-    - cmd: remove from load balancer deployment {{ deployment_name }}
+    - podman: remove plone-{{ deployment_name }}-{{ color }}
+
+{%     endfor %}
 
 {%   else %}{# deployment_data.delete #}
 
@@ -101,7 +105,6 @@ remove plone-{{ deployment_name }}-green:
 {%       set deployment_base_port = context.base_port | default(8080) %}
 {%     endif %}
 {%     set port = deployment_base_port + (loop.index0 * 2) %}
-{%     set datadir = data_basedir + "/" + deployment_name %}
 {%     set deployment_address_blue = listen_addr + ":" + ((port + 1)|string) %}
 {%     set deployment_address_green = listen_addr + ":" + ((port)|string) %}
 {%     set options = [
