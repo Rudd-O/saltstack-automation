@@ -1,0 +1,161 @@
+#!/usr/bin/python3
+
+import collections
+import jinja2
+import json
+import requests
+import subprocess
+import sys
+
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
+
+
+def test(address):
+    strat = Retry(total=8, backoff_factor=0.1)
+    adapter = HTTPAdapter(max_retries=strat)
+    sesh = requests.Session()
+    sesh.mount("http://", adapter)
+    sesh.hooks[
+        "response"
+    ] = lambda response, *args, **kwargs: response.raise_for_status()
+    response = sesh.get("http://%s/" % address, timeout=5)
+
+
+try:
+    with open("/etc/varnish/backends.json", "r") as p:
+        config = json.load(p, object_pairs_hook=collections.OrderedDict)
+except FileNotFoundError:
+    config = collections.OrderedDict(
+        {
+            "default_backend": "none",
+            "backends": collections.OrderedDict(),
+        }
+    )
+
+
+args = sys.argv[1:]
+if args[0] == "--default":
+    set_default = True
+    args = args[1:]
+else:
+    set_default = False
+if args[0] == "--delete":
+    delete = True
+    backend = args[1]
+else:
+    delete = False
+
+if delete:
+    if backend in config["backends"]:
+        del config["backends"][backend]
+else:
+    backend, address = args[0:2]
+    host = address.split(":")[0]
+    if not host or host == "0.0.0.0":
+        host = "127.0.0.1"
+    port = address.split(":")[1]
+
+    config["backends"][backend] = {
+        "host": host,
+        "port": port,
+    }
+
+    try:
+        config["backends"][backend]["site"] = args[2]
+    except IndexError:
+        pass
+
+    if set_default:
+        config["default_backend"] = backend
+
+if config["default_backend"] not in config["backends"]:
+    config["default_backend"] = "none"
+
+
+tpl = jinja2.Template(
+    """vcl 4.1;
+
+backend default none;
+
+{% for backend_name, backend in backends.items() %}
+backend plone_{{ backend_name }} {
+   .host = "{{ backend.host }}";
+   .port = "{{ backend.port }}";
+}
+{% endfor %}
+
+sub vcl_recv {
+    if (!req.backend_hint) {
+        set req.backend_hint = plone_{{ default_backend }};
+{% for backend_name in backends %}
+        if (req.url ~ "/deployments/{{ backend_name }}($|/)") {
+            set req.backend_hint = plone_{{ backend_name }};
+            set req.url = regsub(req.url, "^/deployments/{{ backend_name }}", "/VirtualHostBase/" + req.http.X-Forwarded-Proto + "/" + req.http.Host + "/VirtualHostRoot/_vh_deployments/_vh_{{ backend_name }}");
+            return(pass);
+        }
+{% endfor %}
+        if (req.backend_hint == plone_{{ default_backend }}) {
+{%- if backends[default_backend].site | default("") %}
+{%-   set site = "/" + backends[default_backend].site %}
+{%- else %}
+{%-   set site = "" %}
+{%- endif %}
+            set req.url = regsub(req.url, "^", "/VirtualHostBase/" + req.http.X-Forwarded-Proto + "/" + req.http.Host + "{{ site }}" + "/VirtualHostRoot");
+        }
+    }
+}
+"""
+)
+
+rendered = tpl.render(**config)
+
+
+try:
+    with open("/etc/varnish/backends.vcl") as b:
+        existing = b.read()
+except FileNotFoundError:
+    existing = ""
+
+
+if rendered != existing:
+
+    if not delete:
+        print("Ensuring new address responds with HTTP 200...", file=sys.stderr)
+        test(address)
+
+    with open("/etc/varnish/backends.vcl", "w") as b:
+        b.write(rendered)
+
+    print("Reloading varnish...", file=sys.stderr)
+    proc = subprocess.run(
+        ["systemctl", "--system", "reload", "varnish.service"],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    if proc.returncode != 0:
+        with open("/etc/varnish/backends.vcl", "w") as b:
+            b.write(existing)
+        print("Failed to reload varnish: %s" % proc.stdout, file=sys.stderr)
+        print("Failed config:", file=sys.stderr)
+        print(rendered, file=sys.stderr)
+        sys.exit(proc.returncode)
+
+    if delete:
+        comment = "Deleted backend %s." % (backend,)
+    else:
+        comment = "Set backend %s to %s." % (backend, address)
+        if set_default:
+            comment += "  Set default backend to %s." % (backend,)
+    out = json.dumps(
+        {
+            "changed": True,
+            "comment": comment,
+        }
+    )
+    print(out)
+    sys.stdout.flush()
+
+    with open("/etc/varnish/backends.json", "w") as p:
+        json.dump(config, p)

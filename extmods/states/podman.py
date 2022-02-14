@@ -177,7 +177,7 @@ def present(name, image, options=None, dryrun=False, enable=None):
     )
 
 
-def dead(name):
+def _absent_or_dead(name, mode):
     """
     Stops a container by name.
     """
@@ -207,25 +207,55 @@ def dead(name):
                     name=escaped_name,
                 )
             )
-        if is_running:
-            for subcmd in "stop".split():
-                if success():
-                    a(
-                        _single(
-                            "Container %s" % subcmd,
-                            "cmd.run",
-                            name=" ".join(
-                                quote(x) for x in ["podman", "container", subcmd, name]
-                            ),
-                        )
-                    )
 
+            if success() and mode == "absent":
+                a(
+                    _single(
+                        "systemd service deletion",
+                        "file.absent",
+                        name=unit_path,
+                    )
+                )
+                if success() and rets[-1]["changes"]:
+                    # Reload systemd because we deleted the unit file.
+                    if not __opts__["test"]:
+                        co(["systemctl", "--system", "daemon-reload"])
+
+        subcmds = ["stop"] if is_running else []
+        if mode == "absent":
+            subcmds.append("rm")
+        for subcmd in subcmds:
+            if success():
+                a(
+                    _single(
+                        "Container %s" % subcmd,
+                        "cmd.run",
+                        name=" ".join(
+                            quote(x) for x in ["podman", "container", subcmd, name]
+                        ),
+                    )
+                )
+    
     return dict(
         name=name,
         result=success(),
         comment="\n".join(r["comment"] for r in rets),
         changes=dict((r["name"], r["changes"]) for r in rets if r["changes"]),
     )
+
+
+def dead(name):
+    """
+    Stops a container by name.
+    """
+    return _absent_or_dead(name, mode="dead")
+
+
+def absent(name):
+    """
+    Stops and removes a container by name.
+    """
+    return _absent_or_dead(name, mode="absent")
 
 
 def _allocate_subx(type_, name, howmany):

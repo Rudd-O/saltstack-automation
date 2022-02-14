@@ -1,20 +1,11 @@
-{#
-will have to
-
-2. change this formula so it deploys plone with containers, and rotates things
-   start with high level verbs
-   #}
-
-
-{% if salt['pillar.get']("build.repo.client") %}
 include:
+- plone.cache.set_backend
+{% if salt['pillar.get']("build.repo.client") %}
 - build.repo.client
 {% endif %}
 
-
-{% set context = pillar.get(sls.replace(".", ":"), {}) %}
+{% set context = salt['pillar.get'](sls.replace(".", ":"), {}) %}
 {% set data_basedir = context.get("directories", {}).get("datadir", "/srv/plone") %}
-
 
 plone-deps:
   pkg.installed:
@@ -77,10 +68,32 @@ system requirements:
 {% for deployment_name, deployment_data in context.deployments.items()
      if deployment_name in limit_to %}
 
+{%   set quoted_deployment_name = salt.text.quote(deployment_name) %}
+
 {%   if deployment_data.delete | default(False) %}
+
+remove from load balancer deployment {{ deployment_name }}:
+  cmd.run:
+  - name: /usr/local/bin/varnish-set-backend --delete {{ quoted_deployment_name }}
+  - stateful: true
+  - require:
+    - file: /usr/local/bin/varnish-set-backend
+
+remove plone-{{ deployment_name }}-blue:
+  podman.absent:
+  - name: plone-{{ deployment_name }}-blue
+  - require:
+    - cmd: remove from load balancer deployment {{ deployment_name }}
+
+remove plone-{{ deployment_name }}-green:
+  podman.absent:
+  - name: plone-{{ deployment_name }}-green
+  - require:
+    - cmd: remove from load balancer deployment {{ deployment_name }}
 
 {%   else %}{# deployment_data.delete #}
 
+{%     set is_default = (loop.index0 == 0) %}
 {%     set listen_addr = deployment_data.listen_addr | default( context.listen_addr | default ("127.0.5.1") ) %}
 {%     if base_port in deployment_data %}
 {%       set deployment_base_port = deployment_data.base_port %}
@@ -89,22 +102,32 @@ system requirements:
 {%     endif %}
 {%     set port = deployment_base_port + (loop.index0 * 2) %}
 {%     set datadir = data_basedir + "/" + deployment_name %}
+{%     set deployment_address_blue = listen_addr + ":" + ((port + 1)|string) %}
+{%     set deployment_address_green = listen_addr + ":" + ((port)|string) %}
 {%     set options = [
          {"tls-verify": "false"},
          {"subgidname": context.users.process},
          {"subuidname": context.users.process},
        ] %}
 {%     set options_blue = options + [
-         {"p": listen_addr + ":" + ((port + 1)|string) + ":8080"},
+         {"p": deployment_address_blue + ":8080"},
          {"v": datadir + "-blue/filestorage:/data/filestorage:rw,Z,shared,U"},
          {"v": datadir + "-blue/blobstorage:/data/blobstorage:rw,Z,shared,U"},
        ] %}
 {%     set options_green = options + [
-         {"p": listen_addr + ":" + ((port)|string) + ":8080"},
+         {"p": deployment_address_green + ":8080"},
          {"v": datadir + "-green/filestorage:/data/filestorage:rw,Z,shared,U"},
          {"v": datadir + "-green/blobstorage:/data/blobstorage:rw,Z,shared,U"},
        ] %}
 {%     set green_datadir = datadir + "-green" %}
+{%     set quoted_deployment_address_blue = salt.text.quote(deployment_address_blue) %}
+{%     set quoted_deployment_address_green = salt.text.quote(deployment_address_green) %}
+{%     if deployment_data.site | default("") %}
+{%       set quoted_deployment_site = salt.text.quote(deployment_data.site) %}
+{%     else %}
+{%       set quoted_deployment_site = "" %}
+{%     endif %}
+{%     set quoted_deployment_address_green = salt.text.quote(deployment_address_green) %}
 {%     set quoted_datadir = salt.text.quote(datadir) %}
 {%     set green_exists = salt.file.directory_exists(green_datadir) %}
 
@@ -169,10 +192,12 @@ start plone-{{ deployment_name }}-blue:
   - options: {{ options_blue | json }}
   - onchanges: []
 
-wait for failover from green to blue:
+wait for failover from green to blue in {{ deployment_name }}:
   cmd.run:
-  - name: /bin/true
+  - name: /usr/local/bin/varnish-set-backend {{ quoted_deployment_name }} {{ quoted_deployment_address_blue }} {{ quoted_deployment_site }}
   - stateful: true
+  - require:
+    - file: /usr/local/bin/varnish-set-backend
   - onchanges:
     - podman: start plone-{{ deployment_name }}-blue
 
@@ -180,7 +205,7 @@ stop plone-{{ deployment_name }}-green:
   podman.dead:
   - name: plone-{{ deployment_name }}-green
   - require:
-    - cmd: wait for failover from green to blue
+    - cmd: wait for failover from green to blue in {{ deployment_name }}
   - onchanges:
     - podman: start plone-{{ deployment_name }}-blue
   - onchanges_in:
@@ -214,18 +239,19 @@ start plone-{{ deployment_name }}-green:
   - require:
     - cmd: copy over {{ deployment_name }} blue to green
 
-wait for failover from blue to green:
+wait for failover from blue to green in {{ deployment_name }}:
   cmd.run:
-  - name: /bin/true
+  - name: /usr/local/bin/varnish-set-backend {% if is_default %}--default {% endif %}{{ quoted_deployment_name }} {{ quoted_deployment_address_green }} {{ quoted_deployment_site }} 
   - stateful: true
-  - onchanges:
+  - require:
+    - file: /usr/local/bin/varnish-set-backend
     - podman: start plone-{{ deployment_name }}-green
 
 stop plone-{{ deployment_name }}-blue again:
   podman.dead:
   - name: plone-{{ deployment_name }}-blue
   - require:
-    - cmd: wait for failover from blue to green
+    - cmd: wait for failover from blue to green in {{ deployment_name }}
 
 {%   endif %}{# deployment_data.delete #}
 
