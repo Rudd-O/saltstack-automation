@@ -10,6 +10,9 @@ import sys
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
+backends_file = "/etc/varnish/plone/50-backends.vcl"
+backend_config = "/etc/varnish/plone-backend-config.json"
+
 
 def test(address):
     strat = Retry(total=8, backoff_factor=0.1)
@@ -23,7 +26,7 @@ def test(address):
 
 
 try:
-    with open("/etc/varnish/backends.json", "r") as p:
+    with open(backend_config, "r") as p:
         config = json.load(p, object_pairs_hook=collections.OrderedDict)
 except FileNotFoundError:
     config = collections.OrderedDict(
@@ -76,7 +79,9 @@ if config["default_backend"] not in config["backends"]:
 tpl = jinja2.Template(
     """vcl 4.1;
 
+{%- if default_backend == "none" %}
 backend default none;
+{% endif %}
 
 {% for backend_name, backend in backends.items() %}
 backend plone_{{ backend_name }} {
@@ -86,33 +91,44 @@ backend plone_{{ backend_name }} {
 {% endfor %}
 
 sub vcl_recv {
-    if (!req.backend_hint) {
+    if (!req.http.Plone-Backend) {
+{%- if default_backend != "none" %}
         set req.backend_hint = plone_{{ default_backend }};
+        set req.http.Plone-Backend = "{{ default_backend }}";
+{%-   endif %}
+
 {% for backend_name in backends %}
         if (req.url ~ "/deployments/{{ backend_name }}($|/)") {
             set req.backend_hint = plone_{{ backend_name }};
+            set req.http.Plone-Backend = "{{ backend_name }}";
             set req.url = regsub(req.url, "^/deployments/{{ backend_name }}", "/VirtualHostBase/" + req.http.X-Forwarded-Proto + "/" + req.http.Host + "/VirtualHostRoot/_vh_deployments/_vh_{{ backend_name }}");
             return(pass);
         }
 {% endfor %}
+
+{%- if default_backend != "none" %}
         if (req.backend_hint == plone_{{ default_backend }}) {
-{%- if backends[default_backend].site | default("") %}
-{%-   set site = "/" + backends[default_backend].site %}
-{%- else %}
-{%-   set site = "" %}
-{%- endif %}
+{%-   if (backends[default_backend].site | default("")) %}
+{%-     set site = "/" + backends[default_backend].site %}
+{%-   else %}
+{%-     set site = "" %}
+{%-   endif %}
             set req.url = regsub(req.url, "^", "/VirtualHostBase/" + req.http.X-Forwarded-Proto + "/" + req.http.Host + "{{ site }}" + "/VirtualHostRoot");
         }
+{%- endif %}
     }
 }
 """
 )
 
-rendered = tpl.render(**config)
+try:
+    rendered = tpl.render(**config)
+except Exception:
+    assert 0, config
 
 
 try:
-    with open("/etc/varnish/backends.vcl") as b:
+    with open(backends_file) as b:
         existing = b.read()
 except FileNotFoundError:
     existing = ""
@@ -124,7 +140,7 @@ if rendered != existing:
         print("Ensuring new address responds with HTTP 200...", file=sys.stderr)
         test(address)
 
-    with open("/etc/varnish/backends.vcl", "w") as b:
+    with open(backends_file, "w") as b:
         b.write(rendered)
 
     print("Reloading varnish...", file=sys.stderr)
@@ -135,7 +151,7 @@ if rendered != existing:
         stderr=subprocess.STDOUT,
     )
     if proc.returncode != 0:
-        with open("/etc/varnish/backends.vcl", "w") as b:
+        with open(backends_file, "w") as b:
             b.write(existing)
         print("Failed to reload varnish: %s" % proc.stdout, file=sys.stderr)
         print("Failed config:", file=sys.stderr)
@@ -157,5 +173,5 @@ if rendered != existing:
     print(out)
     sys.stdout.flush()
 
-    with open("/etc/varnish/backends.json", "w") as p:
+    with open(backend_config, "w") as p:
         json.dump(config, p)

@@ -1,7 +1,7 @@
 vcl 4.1;
 
 sub sanitize_plone_cookies {
-    # Cookie sanitization for Plone caching.
+    # Cookie sanitization for proper Plone proxy caching.
     if (req.http.Cookie ~ "(^|; *)__ac" || req.http.Cookie ~ "(^|; *)__cp" || req.http.Authorization) {
         # If the user is logged in, we let Plone-specific authorized user cookies through.
         set req.http.Temp-Cookie = ";" + req.http.Cookie;

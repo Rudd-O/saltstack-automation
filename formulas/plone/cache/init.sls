@@ -46,29 +46,45 @@ reload varnish:
   - onchanges_in:
     - cmd: reload systemd for varnish
 
-/etc/varnish:
+/etc/varnish/plone:
   file.recurse:
   - source: salt://{{ sls.replace(".", "/") }}/vcl
+  - clean: true
   - exclude_pat:
-    - backends.vcl
+    - 50-backends.vcl
   - require:
     - pkg: varnish
   - require_in:
     - service: varnish
+    - cmd: /etc/varnish/plone/default.vcl
+    - file: /usr/local/bin/varnish-set-backend
   - onchanges_in:
     - cmd: reload varnish
 
-{% if not salt.file.file_exists("/etc/varnish/backends.vcl") %}
-/etc/varnish/backends.vcl:
+{% if not salt.file.file_exists("/etc/varnish/plone/50-backends.vcl") %}
+/etc/varnish/plone/50-backends.vcl:
   file.managed:
-  - source: salt://{{ sls.replace(".", "/") }}/vcl/backends.vcl
+  - source: salt://{{ sls.replace(".", "/") }}/vcl/50-backends.vcl
   - require:
     - pkg: varnish
+    - file: /etc/varnish/plone
   - onchanges_in:
     - cmd: reload varnish
   - require_in:
     - service: varnish
+    - cmd: /etc/varnish/plone/default.vcl
+    - file: /usr/local/bin/varnish-set-backend
 {% endif %}
+
+/etc/varnish/plone/default.vcl:
+  cmd.script:
+  - source: salt://{{ sls.replace(".", "/") }}/generate-default.vcl.py
+  - stateful: true
+  - require_in:
+    - service: varnish
+    - file: /usr/local/bin/varnish-set-backend
+  - onchanges_in:
+    - cmd: reload varnish
 
 extend:
   /usr/local/bin/varnish-set-backend:
