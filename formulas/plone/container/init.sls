@@ -12,7 +12,7 @@ include:
 {% endif %}
 
 
-{% set context = pillar.plone.container %}
+{% set context = pillar.get(sls.replace(".", ":"), {}) %}
 {% set data_basedir = context.get("directories", {}).get("datadir", "/srv/plone") %}
 
 
@@ -72,7 +72,7 @@ plone-deps:
 system requirements:
   test.nop
 
-{% set base_port = deployment_data.base_port | default(8080) %}
+{% set base_port = context.base_port | default(8080) %}
 {% set limit_to = pillar.limit_to | default (context.deployments.keys() | list) %}
 {% for deployment_name, deployment_data in context.deployments.items()
      if deployment_name in limit_to %}
