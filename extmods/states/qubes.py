@@ -143,6 +143,14 @@ def enable_dom0_managed_service(
         raise NotImplementedError("The scope %r is not implemented yet" % scope)
 
     ret = dict(name=name, result=False, changes={}, comment="")
+    if __salt__["grains.get"]("qubes:persistence") != "rw-only":
+        return _mimic(
+            ret,
+            {
+                "result": True,
+                "comment": "Nothing to do (not a Qubes OS AppVM with ephemeral root).",
+            },
+        )
 
     if enable:
         ret1 = _single(
