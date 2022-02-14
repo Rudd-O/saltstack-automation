@@ -235,7 +235,7 @@ def _absent_or_dead(name, mode):
                         ),
                     )
                 )
-    
+
     return dict(
         name=name,
         result=success(),
