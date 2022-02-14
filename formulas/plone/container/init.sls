@@ -72,6 +72,7 @@ plone-deps:
 system requirements:
   test.nop
 
+{% set base_port = deployment_data.base_port | default(8080) %}
 {% set limit_to = pillar.limit_to | default (context.deployments.keys() | list) %}
 {% for deployment_name, deployment_data in context.deployments.items()
      if deployment_name in limit_to %}
@@ -80,8 +81,13 @@ system requirements:
 
 {%   else %}{# deployment_data.delete #}
 
-{%     set port = deployment_data.base_port + (loop.index0 * 2) %}
-{%     set listen_addr = deployment_data.listen_addr | default ("127.0.5.1") %}
+{%     set listen_addr = deployment_data.listen_addr | default( context.listen_addr | default ("127.0.5.1") ) %}
+{%     if base_port in deployment_data %}
+{%       set deployment_base_port = deployment_data.base_port %}
+{%     else %}
+{%       set deployment_base_port = context.base_port | default(8080) %}
+{%     endif %}
+{%     set port = deployment_base_port + (loop.index0 * 2) %}
 {%     set datadir = data_basedir + "/" + deployment_name %}
 {%     set options = [
          {"tls-verify": "false"},
