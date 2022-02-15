@@ -103,7 +103,7 @@ def copy_over(source, destination, **kwargs):
     return Cmd.run(
         f"copy over {source} to {destination}",
         name="""set -e
-rsync -a --delete --inplace %(source)s/filestorage/ %(destination)s-blue/filestorage/
+rsync -a --delete --inplace %(source)s/filestorage/ %(destination)s/filestorage/
 rm -rf %(destination)s/blobstorage
 cp -al %(source)s/blobstorage %(destination)s/blobstorage
         """
