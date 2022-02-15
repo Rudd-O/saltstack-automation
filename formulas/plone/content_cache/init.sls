@@ -31,6 +31,8 @@ reload varnish:
   cmd.run:
   - name: systemctl --system reload varnish
   - onchanges: []
+  - require:
+    - service: varnish
 
 /etc/systemd/system/varnish.service.d/custom.conf: 
 {% if listen_addr or opts %}
