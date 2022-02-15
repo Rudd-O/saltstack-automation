@@ -113,13 +113,16 @@ cp -al %(source)s/blobstorage %(destination)s/blobstorage
     )
 
 
-def failover(n, deployment_address, site, **kwargs):
-    req = [File("/usr/local/bin/varnish-set-backend")]
-    kwargs["require"] = kwargs.get("require", []) + req
+def failover(n, deployment_address, site, default, **kwargs):
+    default = "--default" if default else ""
+    kwargs["require"] = kwargs.get("require", []) + [
+        File("/usr/local/bin/varnish-set-backend")
+    ]
     return Cmd.run(
         f"fail over {n} to {deployment_address}",
-        name="/usr/local/bin/varnish-set-backend %s %s %s"
+        name="/usr/local/bin/varnish-set-backend %s %s %s %s"
         % (
+            default,
             quote(n),
             quote(deployment_address),
             quote(site) if site else "",
@@ -211,6 +214,7 @@ def deploy(i, n, data):
         n,
         deployment_address_blue,
         deployment_data.get("site"),
+        default=i == 0,
         onchanges=[blue_started],
     ).requisite
 
@@ -250,6 +254,7 @@ def deploy(i, n, data):
         n,
         deployment_address_green,
         deployment_data.get("site"),
+        default=i == 0,
         require=[green_started],
     ).requisite
 
