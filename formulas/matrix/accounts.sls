@@ -1,7 +1,7 @@
 #!objects
 
 
-from salt://lib/qubes.sls import rw_only_or_physical
+from salt://lib/qubes.sls import template
 
 
 Test.nop("Accounts not yet defined")
@@ -32,7 +32,7 @@ exit $ret
         salt.text.quote(config_file)
     )
 
-if rw_only_or_physical():
+if not template():
     accts = pillar("matrix:accounts", [])
     server_url = "https://localhost:8448"
     config_file = "/etc/synapse/homeserver.yaml"

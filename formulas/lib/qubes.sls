@@ -24,6 +24,10 @@ def rw_only_or_physical():
     return grains('qubes:persistence') in ('rw-only', '')
 
 
+def template():
+    return grains('qubes:vm_type') == "TemplateVM"
+
+
 def physical():
     return grains('qubes:persistence') in ('')
 

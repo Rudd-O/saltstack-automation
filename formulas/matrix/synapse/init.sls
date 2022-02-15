@@ -3,7 +3,7 @@
 import os
 
 
-from salt://lib/qubes.sls import rw_only_or_physical, fully_persistent_or_physical
+from salt://lib/qubes.sls import template, fully_persistent_or_physical
 
 
 if fully_persistent_or_physical():
@@ -21,7 +21,7 @@ if fully_persistent_or_physical():
 else:
     deps = []
 
-if rw_only_or_physical():
+if not template():
     context = pillar("matrix:synapse", {})
     datadir = context.setdefault("datadir", "/var/lib/synapse")
     confdir = context.setdefault("confdir", "/etc/synapse")

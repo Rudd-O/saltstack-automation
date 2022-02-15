@@ -3,14 +3,14 @@
 import os
 
 
-from salt://lib/qubes.sls import rw_only_or_physical, physical
+from salt://lib/qubes.sls import template, physical
 from salt://lib/letsencrypt.sls import privkey_path, fullchain_path
 
 include("nginx")
 include("letsencrypt")
 
 
-if rw_only_or_physical():
+if not template():
     synapse = pillar("matrix:synapse", {})
     delegated_hostname = synapse["delegated_hostname"]
     cert = fullchain_path(delegated_hostname)

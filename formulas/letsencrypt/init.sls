@@ -1,6 +1,6 @@
 #!objects
 
-from salt://lib/qubes.sls import rw_only_or_physical, fully_persistent_or_physical
+from salt://lib/qubes.sls import template, fully_persistent_or_physical
 from salt://lib/letsencrypt.sls import certbot_webroot, certbot_live, certificate_dir, fullchain_path, privkey_path
 
 
@@ -14,7 +14,7 @@ if fully_persistent_or_physical():
 else:
     deps = []
 
-if rw_only_or_physical():
+if not template():
     context = pillar("letsencrypt", {})
     default_renewal_email = context.get("renewal_email")
     hosts = context["hosts"]

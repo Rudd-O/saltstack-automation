@@ -3,14 +3,14 @@
 import os
 
 
-from salt://lib/qubes.sls import rw_only_or_physical, physical
+from salt://lib/qubes.sls import template, physical
 from salt://lib/letsencrypt.sls import privkey_path, fullchain_path
 
 include("nginx")
 include("letsencrypt")
 
 
-if rw_only_or_physical():
+if not template():
     context = pillar(sls.replace(".", ":"), {})
     server_name = context["server_name"]
     cert = fullchain_path(server_name)
