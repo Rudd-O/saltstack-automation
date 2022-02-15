@@ -1,265 +1,275 @@
-include:
-- plone.content_cache.set_backend
-{% if salt['pillar.get']("build.repo.client") %}
-- build.repo.client
-{% endif %}
+#!objects
 
-{% set context = salt['pillar.get'](sls.replace(".", ":"), {}) %}
-{% set data_basedir = context.get("directories", {}).get("datadir", "/srv/plone") %}
+from os.path import join
+from shlex import quote
 
-plone-deps:
-  pkg.installed:
-  - pkgs:
-    - podman
-  - require_in:
-    - test: system requirements
+include("plone.content_cache.set_backend")
 
-{% for name, user, home in [
-    ("process", context.users.process, "/var/lib/" + context.users.process),
-   ] %}
+if pillar("build:repo:client", ""):
+    include("build.repo.client")
 
-{{ name }} user {{ user }}:
-  group.present:
-  - name: {{ user }}
-  user.present:
-  - name: {{ user }}
-  - gid: {{ user }}
-{%   if not salt.user.info(user) %}{# Don't set home if already exists. #}
-  - home: {{ home }}
-{%   endif %}
-  - require:
-    - group: {{ name }} user {{ user }}
 
-{{ user }} subgid:
-  podman.allocate_subgid_range:
-  - name: {{ user }}
-  - howmany: 1000
-  - require:
-    - group: {{ name }} user {{ user }}
-  - require_in:
-    - test: system requirements
+context = pillar(sls.replace(".", ":"), {})
+data_basedir = context.get("directories", {}).get("datadir", "/srv/plone")
+default_base_port = context.get("base_port", 8080)
+default_listen_addr = context.get("listen_addr", "127.0.5.1")
+deployments = context["deployments"]
+limit_to = pillar("limit_to", list(deployments.keys()))
+user = context["users"]["process"]
 
-{{ user }} subuid:
-  podman.allocate_subuid_range:
-  - name: {{ user }}
-  - howmany: 1000
-  - require:
-    - user: {{ name }} user {{ user }}
-  - require_in:
-    - test: system requirements
 
-{% endfor %}
+def reqs():
+    sysreq = Test("system requirements")
 
-{{ data_basedir }}:
-  file.directory:
-  - mode: 0711
-  - user: {{ context.users.process }}
-  - group: {{ context.users.process }}
-  - require:
-    - user: process user {{ context.users.process }}
-  - require_in:
-    - test: system requirements
+    Test.nop(
+        "system requirements",
+        require=[Test("repo deployed")] if pillar("build:repo:client", "") else [],
+    )
 
-system requirements:
-  test.nop
+    Pkg.installed(
+        "plone-deps",
+        pkgs=["podman"],
+        require_in=[sysreq],
+    )
 
-{% set base_port = context.base_port | default(8080) %}
-{% set limit_to = pillar.limit_to | default (context.deployments.keys() | list) %}
-{% for deployment_name, deployment_data in context.deployments.items()
-     if deployment_name in limit_to %}
+    for name, user, home in [
+        (
+            "process",
+            context["users"]["process"],
+            join("/var/lib", context["users"]["process"]),
+        )
+    ]:
+        with Group.present(
+            "%(name)s user %(user)s" % locals(),
+            name=user,
+        ):
+            Podman.allocate_subgid_range(
+                "%(user)s subgid" % locals(),
+                name=user,
+                howmany=1000,
+                require_in=[sysreq],
+            )
+            with User.present(
+                "%(name)s user %(user)s" % locals(),
+                name=user,
+                gid=user,
+                home=home
+                if not salt.user.info(user)
+                else None,  # Don't set home if already exists.
+            ):
+                Podman.allocate_subuid_range(
+                    "%(user)s subuid" % locals(),
+                    name=user,
+                    howmany=1000,
+                    require_in=[sysreq],
+                )
 
-{%   set datadir = data_basedir + "/" + deployment_name %}
-{%   set quoted_deployment_name = salt.text.quote(deployment_name) %}
+    File.directory(
+        data_basedir,
+        user=user,
+        group=user,
+        require=[User("process user %s" % user)],
+        require_in=[sysreq],
+    )
 
-{%   if deployment_data.delete | default(False) %}
+    return sysreq
 
-remove from load balancer deployment {{ deployment_name }}:
-  cmd.run:
-  - name: /usr/local/bin/varnish-set-backend --delete {{ quoted_deployment_name }}
-  - stateful: true
-  - require:
-    - file: /usr/local/bin/varnish-set-backend
 
-{%     for color in ["blue", "green"] %}
+sysreq = reqs()
 
-remove plone-{{ deployment_name }}-{{ color }}:
-  podman.absent:
-  - name: plone-{{ deployment_name }}-{{ color }}
-  - require:
-    - cmd: remove from load balancer deployment {{ deployment_name }}
 
-{{ datadir }}-{{ color }}:
-  file.absent:
-  - require:
-    - podman: remove plone-{{ deployment_name }}-{{ color }}
+def delete(n, data):
+    datadir = join(data_basedir, n)
+    lbn = f"remove deployment {n} from load balancer"
+    lbnn = Cmd.run(
+        lbn,
+        name="/usr/local/bin/varnish-set-backend --delete %s" % quote(n),
+        stateful=True,
+        require=[File("/usr/local/bin/varnish-set-backend")],
+    ).requisite
+    for color in "blue green".split():
+        nc = f"plone-{n}-{color}"
+        with Podman.absent(
+            f"remove {nc}",
+            name=nc,
+            require=[lbnn],
+        ):
+            File.absent(f"{datadir}-{color}")
 
-{%     endfor %}
 
-{%   else %}{# deployment_data.delete #}
+def copy_over(source, destination, **kwargs):
+    return Cmd.run(
+        f"copy over {source} to {destination}",
+        name="""set -e
+rsync -a --delete --inplace %(source)s/filestorage/ %(destination)s-blue/filestorage/
+rm -rf %(destination)s/blobstorage
+cp -al %(source)s/blobstorage %(destination)s/blobstorage
+        """
+        % {
+            "source": quote(source),
+            "destination": quote(destination),
+        },
+        **kwargs,
+    )
 
-{%     set is_default = (loop.index0 == 0) %}
-{%     set listen_addr = deployment_data.listen_addr | default( context.listen_addr | default ("127.0.5.1") ) %}
-{%     if base_port in deployment_data %}
-{%       set deployment_base_port = deployment_data.base_port %}
-{%     else %}
-{%       set deployment_base_port = context.base_port | default(8080) %}
-{%     endif %}
-{%     set port = deployment_base_port + (loop.index0 * 2) %}
-{%     set deployment_address_blue = listen_addr + ":" + ((port + 1)|string) %}
-{%     set deployment_address_green = listen_addr + ":" + ((port)|string) %}
-{%     set options = [
-         {"tls-verify": "false"},
-         {"subgidname": context.users.process},
-         {"subuidname": context.users.process},
-       ] %}
-{%     set options_blue = options + [
-         {"p": deployment_address_blue + ":8080"},
-         {"v": datadir + "-blue/filestorage:/data/filestorage:rw,Z,shared,U"},
-         {"v": datadir + "-blue/blobstorage:/data/blobstorage:rw,Z,shared,U"},
-       ] %}
-{%     set options_green = options + [
-         {"p": deployment_address_green + ":8080"},
-         {"v": datadir + "-green/filestorage:/data/filestorage:rw,Z,shared,U"},
-         {"v": datadir + "-green/blobstorage:/data/blobstorage:rw,Z,shared,U"},
-       ] %}
-{%     set green_datadir = datadir + "-green" %}
-{%     set quoted_deployment_address_blue = salt.text.quote(deployment_address_blue) %}
-{%     set quoted_deployment_address_green = salt.text.quote(deployment_address_green) %}
-{%     if deployment_data.site | default("") %}
-{%       set quoted_deployment_site = salt.text.quote(deployment_data.site) %}
-{%     else %}
-{%       set quoted_deployment_site = "" %}
-{%     endif %}
-{%     set quoted_deployment_address_green = salt.text.quote(deployment_address_green) %}
-{%     set quoted_datadir = salt.text.quote(datadir) %}
-{%     set green_exists = salt.file.directory_exists(green_datadir) %}
 
-{%     if green_exists %}
+def failover(n, deployment_address, site, **kwargs):
+    req = [File("/usr/local/bin/varnish-set-backend")]
+    kwargs["require"] = kwargs.get("require", []) + req
+    return Cmd.run(
+        f"fail over {n} to {deployment_address}",
+        name="/usr/local/bin/varnish-set-backend %s %s %s"
+        % (
+            quote(n),
+            quote(deployment_address),
+            quote(site) if site else "",
+        ),
+        stateful=True,
+        **kwargs,
+    )
 
-check plone-{{ deployment_name }}-green:
-  podman.present:
-  - name: plone-{{ deployment_name }}-green
-  - image: {{ deployment_data.image }}
-  - dryrun: true
-  - options: {{ options_green | json }}
-  - require:
-    - test: system requirements
 
-stop plone-{{ deployment_name }}-blue:
-  podman.dead:
-  - name: plone-{{ deployment_name }}-blue
-  - onchanges:
-    - podman: check plone-{{ deployment_name }}-green
+def deploy(i, n, data):
+    datadir = join(data_basedir, n)
+    listen_addr = data.get("listen_addr", default_listen_addr)
+    base_port = data.get("base_port", default_base_port)
+    port = base_port + (i * 2)
+    deployment_address_green = "%s:%d" % (listen_addr, port)
+    deployment_address_blue = "%s:%d" % (listen_addr, port + 1)
+    green_datadir = datadir + "-green"
+    blue_datadir = datadir + "-blue"
+    options = [
+        {"tls-verify": "false"},
+        {"subgidname": user},
+        {"subuidname": user},
+    ]
+    options_blue = options + [
+        {"p": deployment_address_blue + ":8080"},
+        {"v": join(blue_datadir, "filestorage") + ":/data/filestorage:rw,Z,shared,U"},
+        {"v": join(blue_datadir, "blobstorage") + ":/data/blobstorage:rw,Z,shared,U"},
+    ]
+    options_green = options + [
+        {"p": deployment_address_green + ":8080"},
+        {"v": join(green_datadir, "filestorage") + ":/data/filestorage:rw,Z,shared,U"},
+        {"v": join(green_datadir, "blobstorage") + ":/data/blobstorage:rw,Z,shared,U"},
+    ]
 
-copy over {{ deployment_name }} green to blue:
-  cmd.run:
-  - name: |
-      set -e
-      rsync -a --delete --inplace {{ quoted_datadir }}-green/filestorage/ {{ quoted_datadir }}-blue/filestorage/
-      rm -rf {{ quoted_datadir }}-blue/blobstorage
-      cp -al {{ quoted_datadir }}-green/blobstorage {{ quoted_datadir }}-blue/blobstorage
-  - require:
-    - podman: stop plone-{{ deployment_name }}-blue
-  - onchanges:
-    - podman: check plone-{{ deployment_name }}-green
-  - onchanges_in:
-    - podman: start plone-{{ deployment_name }}-blue
+    nc_blue = f"plone-{n}-blue"
+    nc_green = f"plone-{n}-green"
 
-{%     else %}
+    if salt.file.directory_exists(green_datadir):
 
-{%       for x in "", "/filestorage", "/blobstorage" %}
+        check_green = Podman.present(
+            f"check {nc_green}",
+            name=nc_green,
+            image=deployment_data["image"],
+            dryrun=True,
+            options=options_green,
+            require=[sysreq],
+        ).requisite
+        blue_dead = Podman.dead(
+            f"stop {nc_blue}",
+            name=nc_blue,
+            onchanges=[check_green],
+        ).requisite
+        co = [
+            copy_over(
+                green_datadir,
+                blue_datadir,
+                require=[blue_dead],
+                onchanges=[check_green],
+            ).requisite
+        ]
 
-{{ datadir }}-blue{{ x }}:
-  file.directory:
-  - user: {{ context.users.process }}
-  - mode: "0755"
-{%         if x != "" %}
-  - require:
-    - file: {{ datadir }}-blue
-  - onchanges_in:
-    - podman: start plone-{{ deployment_name }}-blue
-{%         else %}
-  - require:
-    - test: system requirements
-{%         endif %}
-  - unless: test -d {{ quoted_datadir }}-blue{{ x }}
+    else:
 
-{%       endfor %}
+        co = []
+        with File.directory(
+            f"{blue_datadir}",
+            user=user,
+            mode="0755",
+            require=[sysreq],
+            unless="test -d %s" % quote(nc_blue),
+        ):
+            for x in ["/filestorage", "/blobstorage"]:
+                File.directory(
+                    f"{blue_datadir}{x}",
+                    user=user,
+                    mode="0755",
+                    unless="test -d %s" % quote(blue_datadir + x),
+                )
+            co.append(File(f"{blue_datadir}{x}"))
 
-{%     endif %}
+    blue_started = Podman.present(
+        f"start {nc_blue}",
+        name=nc_blue,
+        image=deployment_data["image"],
+        options=options_blue,
+        onchanges=co,
+    ).requisite
+    failover_to_blue = failover(
+        n,
+        deployment_address_blue,
+        deployment_data.get("site"),
+        onchanges=[blue_started],
+    ).requisite
 
-start plone-{{ deployment_name }}-blue:
-  podman.present:
-  - name: plone-{{ deployment_name }}-blue
-  - image: {{ deployment_data.image }}
-  - options: {{ options_blue | json }}
-  - onchanges: []
+    # We have failed over to blue.
 
-wait for failover from green to blue in {{ deployment_name }}:
-  cmd.run:
-  - name: /usr/local/bin/varnish-set-backend {{ quoted_deployment_name }} {{ quoted_deployment_address_blue }} {{ quoted_deployment_site }}
-  - stateful: true
-  - require:
-    - file: /usr/local/bin/varnish-set-backend
-  - onchanges:
-    - podman: start plone-{{ deployment_name }}-blue
+    green_dead = Podman.dead(
+        f"stop {nc_green}",
+        name=nc_green,
+        require=[failover_to_blue],
+        onchanges=[blue_started],
+    ).requisite
 
-stop plone-{{ deployment_name }}-green:
-  podman.dead:
-  - name: plone-{{ deployment_name }}-green
-  - require:
-    - cmd: wait for failover from green to blue in {{ deployment_name }}
-  - onchanges:
-    - podman: start plone-{{ deployment_name }}-blue
-  - onchanges_in:
-    - cmd: copy over {{ deployment_name }} blue to green
+    green_datadir_present = File.directory(
+        green_datadir,
+        user=user,
+        mode="0755",
+        unless="test -d %s" % quote(green_datadir),
+        require=[green_dead],
+    ).requisite
 
-{{ datadir }}-green:
-  file.directory:
-  - user: {{ context.users.process }}
-  - mode: "0755"
-  - unless: test -d {{ quoted_datadir }}-green
-  - require:
-    - podman: stop plone-{{ deployment_name }}-green
-  - onchanges_in:
-    - cmd: copy over {{ deployment_name }} blue to green
+    co = [
+        copy_over(
+            blue_datadir, green_datadir, onchanges=[green_datadir_present, green_dead]
+        ).requisite
+    ]
 
-copy over {{ deployment_name }} blue to green:
-  cmd.run:
-  - name: |
-      set -e
-      rsync -a --delete --inplace {{ quoted_datadir }}-blue/filestorage/ {{ quoted_datadir }}-green/filestorage/
-      rm -rf {{ quoted_datadir }}-green/blobstorage
-      cp -al {{ quoted_datadir }}-blue/blobstorage {{ quoted_datadir }}-green/blobstorage
-  - onchanges: []
+    green_started = Podman.present(
+        f"start {nc_green}",
+        name=nc_green,
+        image=deployment_data["image"],
+        enable=True,
+        options=options_green,
+        require=co,
+    ).requisite
 
-start plone-{{ deployment_name }}-green:
-  podman.present:
-  - name: plone-{{ deployment_name }}-green
-  - image: {{ deployment_data.image }}
-  - enable: true
-  - options: {{ options_green | json }}
-  - require:
-    - cmd: copy over {{ deployment_name }} blue to green
+    failover_to_green = failover(
+        n,
+        deployment_address_green,
+        deployment_data.get("site"),
+        require=[green_started],
+        onchanges=[blue_started],
+    ).requisite
 
-wait for failover from blue to green in {{ deployment_name }}:
-  cmd.run:
-  - name: /usr/local/bin/varnish-set-backend {% if is_default %}--default {% endif %}{{ quoted_deployment_name }} {{ quoted_deployment_address_green }} {{ quoted_deployment_site }} 
-  - stateful: true
-  - require:
-    - file: /usr/local/bin/varnish-set-backend
-    - podman: start plone-{{ deployment_name }}-green
+    # We have failed over to green.
 
-stop plone-{{ deployment_name }}-blue again:
-  podman.dead:
-  - name: plone-{{ deployment_name }}-blue
-  - require:
-    - cmd: wait for failover from blue to green in {{ deployment_name }}
+    Podman.dead(f"stop {nc_blue} again", name=nc_blue, require=[failover_to_green])
 
-{%   endif %}{# deployment_data.delete #}
 
-{% endfor %}{# for deployment_name in items #}
+for i, (deployment_name, deployment_data) in enumerate(deployments.items()):
+    if deployment_name not in limit_to:
+        continue
 
+    if deployment_data.get("delete"):
+        delete(deployment_name, deployment_data)
+    else:
+        deploy(i, deployment_name, deployment_data)
+
+
+"""
 {#
 
 {%     endfor %}
@@ -334,3 +344,4 @@ cook JS for site {{ upgrade.site }} in {{ deployment_name }}:
 {% endfor %}
 
 #}
+"""
