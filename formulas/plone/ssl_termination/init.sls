@@ -43,6 +43,7 @@ if not template():
                     "max_upload_size": "1000M",
                     "ssl_certificate": cert,
                     "ssl_certificate_key": key,
+                    "hsts": context.get("hsts", True),
                     "server_config": """
                         location / {
                             proxy_set_header X-Forwarded-For $remote_addr;

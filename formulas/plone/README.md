@@ -54,3 +54,8 @@ These settings would:
   by default, requests go to site named `Plone`.  The main Plone
   admin screen would be exposed thru URL path `/deployments/master`.
 * Direct NginX to connect to Varnish at `127.0.0.1:6081`.
+
+## Settings documentation
+
+* `plone:ssl_termination:hsts`: boolean defaulting to `True`; if
+  disabled, HSTS headers are not included.

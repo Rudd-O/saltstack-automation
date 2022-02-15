@@ -9,7 +9,9 @@
         ssl_ciphers PROFILE=SYSTEM;
         ssl_prefer_server_ciphers on;
 
+{%-     if hsts|default(True) %}
         add_header Strict-Transport-Security "max-age=63072000; preload" always;
+{%-     endif %}
 
 {%-     for port in ports %}
         listen {{ port }} ssl http2;

@@ -251,7 +251,6 @@ def deploy(i, n, data):
         deployment_address_green,
         deployment_data.get("site"),
         require=[green_started],
-        onchanges=[blue_started],
     ).requisite
 
     # We have failed over to green.
