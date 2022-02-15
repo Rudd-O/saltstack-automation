@@ -17,6 +17,7 @@ varnish:
   - require:
     - cmd: reload systemd for varnish
 
+{% if salt['grains.get']("qubes:vm_type", "") == "" %}
 varnishd_connect_any:
   selinux.boolean:
   - value: true
@@ -24,6 +25,7 @@ varnishd_connect_any:
     - pkg: varnish
   - require_in:
     - service: varnish
+{% endif %}
 
 reload varnish:
   cmd.run:
