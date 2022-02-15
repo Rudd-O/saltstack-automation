@@ -1,4 +1,4 @@
 include:
 - .ssl_termination
-- .cache
+- .content_cache
 - .container
