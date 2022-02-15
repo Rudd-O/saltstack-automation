@@ -46,7 +46,7 @@ reload varnish:
   - onchanges_in:
     - cmd: reload systemd for varnish
 
-/etc/systemd/system/varnish.service.d/custom.conf: 
+/etc/systemd/system/varnish.service.d/custom.conf:
 {% if listen_addr or opts %}
   file.managed:
   - contents: |
