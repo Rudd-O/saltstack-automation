@@ -57,5 +57,5 @@ if not template():
                     """ % locals(),
                 },
                 require=[Qubes("90-matrix-nginx"), Test("all certificates generated")],
-                watch_in=[Service("nginx")],
+                onchanges_in=[Cmd("reload nginx")],
             )

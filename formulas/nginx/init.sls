@@ -39,8 +39,15 @@ if not template():
         require=deps,
     )
 
-    Service.running(
+    nginx_service = Service.running(
         "nginx",
         enable=True,
         require=[Service("nginx running in HTTP-only mode")],
+    ).requisite
+
+    Cmd.run(
+        "reload nginx",
+        name="systemctl --system reload nginx.service",
+        onchanges=[],
+        require=[nginx_service],
     )
