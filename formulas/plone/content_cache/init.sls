@@ -1,6 +1,11 @@
 {% set context = salt['pillar.get'](sls.replace(".", ":"), {}) %}
-{% set opts = context.opts | default("-s memory=malloc,256m") %}
-{% set listen_addr = context.listen_addr | default(None) %}
+{% if context.get("listen_addr") or context.get("opts") %}
+{%   set opts = context.opts | default("-s memory=malloc,256m") %}
+{%   set listen_addr = context.listen_addr | default(":6081") %}
+{% else %}
+{%   set opts = None %}
+{%   set listen_addr = None %}
+{% endif %}
 
 include:
 - .set_backend
