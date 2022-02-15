@@ -1,5 +1,5 @@
 include:
-- plone.cache.set_backend
+- plone.content_cache.set_backend
 {% if salt['pillar.get']("build.repo.client") %}
 - build.repo.client
 {% endif %}
