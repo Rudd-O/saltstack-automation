@@ -65,7 +65,13 @@ else:
     }
 
     try:
-        config["backends"][backend]["site"] = args[2]
+        site = json.loads(args[2])
+        if type(site) is str:
+            config["backends"][backend]["site"] = site
+            config["backends"][backend]["sites"] = {}
+        else:
+            config["backends"][backend]["site"] = ""
+            config["backends"][backend]["sites"] = site
     except IndexError:
         pass
 
@@ -109,11 +115,18 @@ sub vcl_recv {
 {%- if default_backend != "none" %}
         if (req.backend_hint == plone_{{ default_backend }}) {
 {%-   if (backends[default_backend].site | default("")) %}
-{%-     set site = "/" + backends[default_backend].site %}
+            set req.http.Site = "/{{ backends[default_backend].site }}";
+{%-   elif (backends[default_backend].sites | default({})) %}
+            set req.http.Site = "";
+{%-     for host, site in backends[default_backend].sites.items() %}
+            if (req.http.Host == "{{ host }}") {
+                set req.http.Site = "/{{ site }}";
+            }
+{%-     endfor %}
 {%-   else %}
-{%-     set site = "" %}
+            set req.http.Site = "";
 {%-   endif %}
-            set req.url = regsub(req.url, "^", "/VirtualHostBase/" + req.http.X-Forwarded-Proto + "/" + req.http.Host + "{{ site }}" + "/VirtualHostRoot");
+            set req.url = regsub(req.url, "^", "/VirtualHostBase/" + req.http.X-Forwarded-Proto + "/" + req.http.Host + req.http.Site + "/VirtualHostRoot");
         }
 {%- endif %}
     }

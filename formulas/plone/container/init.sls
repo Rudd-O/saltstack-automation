@@ -1,5 +1,7 @@
 #!objects
 
+import json
+
 from os.path import join
 from shlex import quote
 
@@ -125,7 +127,7 @@ def failover(n, deployment_address, site, default, **kwargs):
             default,
             quote(n),
             quote(deployment_address),
-            quote(site) if site else "",
+            quote(json.dumps(site)),
         ),
         stateful=True,
         **kwargs,
