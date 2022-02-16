@@ -37,6 +37,17 @@ if not template():
             "ssl_certificate_key": key,
             "server_config": """
                 location ~ ^(/_matrix|/_synapse/(client|admin)) {
+                    # Long polling configuration.
+                    proxy_buffering off;
+                    proxy_request_buffering off;
+                    keepalive_timeout   900s;
+                    keepalive_requests  1000000;
+                    proxy_read_timeout  900s;
+                    proxy_send_timeout  900s;
+                    send_timeout        900s;
+                    proxy_ignore_client_abort off;
+                    # End long polling configuration.
+
                     # note: do not add a path (even a single /) after the port in `proxy_pass`,
                     # otherwise nginx will canonicalise the URI and cause signature verification
                     # errors.
@@ -45,10 +56,6 @@ if not template():
                     proxy_set_header X-Forwarded-For $remote_addr;
                     proxy_set_header X-Forwarded-Proto $scheme;
                     proxy_set_header Host $host;
-                    # WebSockets.
-                    proxy_http_version 1.1;
-                    proxy_set_header Upgrade $http_upgrade;
-                    proxy_set_header Connection $connection_upgrade;
                 }
             """ % {"backend": "127.0.0.1:8008"},
         },

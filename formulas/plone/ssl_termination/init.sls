@@ -46,14 +46,15 @@ if not template():
                     "hsts": context.get("hsts", True),
                     "server_config": """
                         location / {
+                            # Varnish configuration.
+                            proxy_buffering off;
+                            proxy_request_buffering off;
+                            # End Varnish configurations.
+
                             proxy_set_header X-Forwarded-For $remote_addr;
                             proxy_set_header X-Forwarded-Proto $scheme;
                             proxy_set_header Host $host;
                             proxy_pass http://%(backend)s;
-                            # WebSockets.
-                            proxy_http_version 1.1;
-                            proxy_set_header Upgrade $http_upgrade;
-                            proxy_set_header Connection $connection_upgrade;
                         }
                     """ % locals(),
                 },
