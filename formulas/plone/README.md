@@ -63,10 +63,23 @@ These settings would:
 * `plone:ssl_termination:hsts`: boolean defaulting to `True`; if
   disabled, HSTS headers are not included.
 
+### `plone:container:deployments` pillar
+
+This pillar contains a dictionary of `{name -> settings` where the
+supported settings are:
+
+* `image`: defines the container image that will be used to deploy
+  Plone.  Images are expected to expose TCP port 8080.
+* (there are other undocumented settings at this time)
+
+All deployments are accessible directly under URL
+`https://<any server hostname>/deployments/<deployment name>`.
+
+The first deployment listed will always be the default deployment.
 
 ### `plone:container:director` pillar
 
-This pillar contains a dictionary of {hostname -> settings} where
+This pillar contains a dictionary of `{hostname -> settings}` where
 the supported settings are:
 
 * `deployment`: defines a deployment from the list of deployments
