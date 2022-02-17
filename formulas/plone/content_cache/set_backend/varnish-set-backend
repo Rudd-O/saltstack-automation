@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 
 import collections
+import datetime
+import difflib
 import jinja2
 import json
 import requests
@@ -31,29 +33,51 @@ try:
 except FileNotFoundError:
     config = collections.OrderedDict(
         {
-            "default_backend": "none",
+            "director": collections.OrderedDict(),
             "backends": collections.OrderedDict(),
         }
     )
 
 
 args = sys.argv[1:]
-if args[0] == "--default":
-    set_default = True
-    args = args[1:]
-else:
-    set_default = False
 if args[0] == "--delete":
+    args = args[1:]
     delete = True
-    backend = args[1]
+    backend = args[0]
+    director = None
 else:
     delete = False
+    backend, address = args[0:2]
+    try:
+        director = json.loads(args[2])
+    except IndexError:
+        director = None
+
+
+if director is not None:
+    config["director"] = director
+
+
+def remove_directors_that_use_nonexistent_deployments():
+    for k, v in list(config["director"].items()):
+        if "deployment" not in v:
+            if config["backends"]:
+                v["deployment"] = list(config["backends"].keys())[0]
+        dep = v["deployment"]
+        if dep not in config["backends"]:
+            print(
+                f"Warning: host {k} directs to undefined deployment {dep}",
+                file=sys.stderr,
+            )
+            del config["director"][k]
+
 
 if delete:
     if backend in config["backends"]:
         del config["backends"][backend]
+    remove_directors_that_use_nonexistent_deployments()
+
 else:
-    backend, address = args[0:2]
     host = address.split(":")[0]
     if not host or host == "0.0.0.0":
         host = "127.0.0.1"
@@ -63,6 +87,7 @@ else:
         "host": host,
         "port": port,
     }
+    remove_directors_that_use_nonexistent_deployments()
 
     try:
         site = json.loads(args[2])
@@ -75,62 +100,73 @@ else:
     except IndexError:
         pass
 
-    if set_default:
-        config["default_backend"] = backend
 
-if config["default_backend"] not in config["backends"]:
-    config["default_backend"] = "none"
+if config["backends"]:
+    config["default_backend"] = list(config["backends"])[0]
+else:
+    config["default_backend"] = None
 
 
 tpl = jinja2.Template(
     """vcl 4.1;
 
-{%- if default_backend == "none" %}
-backend default none;
-{% endif %}
+{%- if not backends %}
 
-{% for backend_name, backend in backends.items() %}
+backend default none;
+
+{%- else %}
+
+{%-   for backend_name, backend in backends.items() %}
 backend plone_{{ backend_name }} {
    .host = "{{ backend.host }}";
    .port = "{{ backend.port }}";
 }
-{% endfor %}
+{%-   endfor %}
 
 sub vcl_recv {
+
     if (!req.http.Plone-Backend) {
-{%- if default_backend != "none" %}
+
+{%-   if default_backend %}
         set req.backend_hint = plone_{{ default_backend }};
         set req.http.Plone-Backend = "{{ default_backend }}";
 {%-   endif %}
 
-{% for backend_name in backends %}
+{%-   for backend_name in backends %}
         if (req.url ~ "/deployments/{{ backend_name }}($|/)") {
             set req.backend_hint = plone_{{ backend_name }};
             set req.http.Plone-Backend = "{{ backend_name }}";
             set req.url = regsub(req.url, "^/deployments/{{ backend_name }}", "/VirtualHostBase/" + req.http.X-Forwarded-Proto + "/" + req.http.Host + "/VirtualHostRoot/_vh_deployments/_vh_{{ backend_name }}");
             return(pass);
         }
-{% endfor %}
+{%-   endfor %}
 
-{%- if default_backend != "none" %}
-        if (req.backend_hint == plone_{{ default_backend }}) {
-{%-   if (backends[default_backend].site | default("")) %}
-            set req.http.Site = "/{{ backends[default_backend].site }}";
-{%-   elif (backends[default_backend].sites | default({})) %}
+{%-   for host, director_data in director.items() %}
+
+        if (req.http.Host == "{{ host }}") {
+
+{%-       if director_data.site | default(None) %}
+            set req.http.Site = "/{{ director_data.site }}";
+{%        else %}
             set req.http.Site = "";
-{%-     for host, site in backends[default_backend].sites.items() %}
-            if (req.http.Host == "{{ host }}") {
-                set req.http.Site = "/{{ site }}";
-            }
-{%-     endfor %}
-{%-   else %}
-            set req.http.Site = "";
-{%-   endif %}
-            set req.url = regsub(req.url, "^", "/VirtualHostBase/" + req.http.X-Forwarded-Proto + "/" + req.http.Host + req.http.Site + "/VirtualHostRoot");
+{%-       endif %}
+
+{%-       if director_data.deployment | default(None) %}
+            set req.backend_hint = plone_{{ director_data.deployment }};
+            set req.http.Plone-Backend = "{{ director_data.deployment }}";
+{%-       endif %}
+
         }
-{%- endif %}
+
+{%-   endfor %}
+
+        set req.url = regsub(req.url, "^", "/VirtualHostBase/" + req.http.X-Forwarded-Proto + "/" + req.http.Host + req.http.Site + "/VirtualHostRoot");
+
     }
+
 }
+
+{% endif %}
 """
 )
 
@@ -148,6 +184,19 @@ except FileNotFoundError:
 
 
 if rendered != existing:
+
+    diff = difflib.unified_diff(
+        existing.splitlines(),
+        rendered.splitlines(),
+        backends_file,
+        backends_file,
+        datetime.datetime.now().astimezone().isoformat(),
+        datetime.datetime.now().astimezone().isoformat(),
+        3,
+    )
+
+    print("Diff:", file=sys.stderr)
+    print("\n".join(diff), file=sys.stderr)
 
     if not delete:
         print("Ensuring new address responds with HTTP 200...", file=sys.stderr)
@@ -175,8 +224,6 @@ if rendered != existing:
         comment = "Deleted backend %s." % (backend,)
     else:
         comment = "Set backend %s to %s." % (backend, address)
-        if set_default:
-            comment += "  Set default backend to %s." % (backend,)
     out = json.dumps(
         {
             "changed": True,

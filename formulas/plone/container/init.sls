@@ -18,6 +18,7 @@ default_listen_addr = context.get("listen_addr", "127.0.5.1")
 deployments = context["deployments"]
 limit_to = pillar("limit_to", list(deployments.keys()))
 user = context["users"]["process"]
+director = context.get("director", {})
 
 
 def reqs():
@@ -115,19 +116,17 @@ cp -al %(source)s/blobstorage %(destination)s/blobstorage
     )
 
 
-def failover(n, deployment_address, site, default, **kwargs):
-    default = "--default" if default else ""
+def failover(n, deployment_address, director, **kwargs):
     kwargs["require"] = kwargs.get("require", []) + [
         File("/usr/local/bin/varnish-set-backend")
     ]
     return Cmd.run(
         f"fail over {n} to {deployment_address}",
-        name="/usr/local/bin/varnish-set-backend %s %s %s %s"
+        name="/usr/local/bin/varnish-set-backend %s %s %s"
         % (
-            default,
             quote(n),
             quote(deployment_address),
-            quote(json.dumps(site)),
+            quote(json.dumps(director)),
         ),
         stateful=True,
         **kwargs,
@@ -215,8 +214,7 @@ def deploy(i, n, data):
     failover_to_blue = failover(
         n,
         deployment_address_blue,
-        deployment_data.get("site"),
-        default=i == 0,
+        director=director,
         onchanges=[blue_started],
     ).requisite
 
@@ -255,8 +253,7 @@ def deploy(i, n, data):
     failover_to_green = failover(
         n,
         deployment_address_green,
-        deployment_data.get("site"),
-        default=i == 0,
+        director=director,
         require=[green_started],
     ).requisite
 

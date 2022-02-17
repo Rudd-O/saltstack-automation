@@ -39,6 +39,9 @@ plone:
     deployments:
       master:
         image: "plone:5.2.7"
+    director:
+      staging.example.org:
+        deployment: master
         site: Plone
 ```
 
@@ -59,3 +62,16 @@ These settings would:
 
 * `plone:ssl_termination:hsts`: boolean defaulting to `True`; if
   disabled, HSTS headers are not included.
+
+
+### `plone:container:director` pillar
+
+This pillar contains a dictionary of {hostname -> settings} where
+the supported settings are:
+
+* `deployment`: defines a deployment from the list of deployments
+  that the host name will use.  If unspecified, it defaults to the
+  first deployment in the deployments list.
+* `site`: defines a Plone site (URL fragment from the root of the
+  Plone container) to serve at this hostname.  If unspecified, it
+  will simply serve the root of the Plone container.
