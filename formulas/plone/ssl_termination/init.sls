@@ -29,8 +29,16 @@ if not template():
     else:
 
         for server_name in server_names:
-            cert = fullchain_path(server_name)
-            key = privkey_path(server_name)
+            if server_name.startswith("www.") and server_name[4:] in server_names:
+                # This is probably a www.example.org / example.org
+                # certificate. Proceed as-is with the same certificate
+                # as for the domain name.
+                domain_name = server_name[4:]
+            else:
+                domain_name = server_name
+
+            cert = fullchain_path(domain_name)
+            key = privkey_path(domain_name)
             File.managed(
                 "/etc/nginx/conf.d/vhosts/%s.conf" % server_name,
                 name="/etc/nginx/conf.d/vhosts/%s.conf" % server_name,
