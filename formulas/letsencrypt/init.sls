@@ -10,7 +10,8 @@ include("nginx")
 if fully_persistent_or_physical():
     with Pkg.installed("certbot"):
         Qubes.enable_dom0_managed_service("certbot-renew", enable=False)
-    deps = [Qubes("certbot-renew")]
+        Service.enabled("certbot-renew.timer")
+    deps = [Qubes("certbot-renew"), Service("certbot-renew.timer")]
 else:
     deps = []
 
