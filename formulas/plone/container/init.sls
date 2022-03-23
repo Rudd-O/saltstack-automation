@@ -35,6 +35,13 @@ def reqs():
         require_in=[sysreq],
     )
 
+    File.managed(
+        "/usr/local/bin/reset-plone-instance",
+        source="salt://" + sls.replace(".", "/") + "reset-plone-instance",
+        mode="0755",
+        require_in=[sysreq],
+    )
+
     for name, user, home in [
         (
             "process",
