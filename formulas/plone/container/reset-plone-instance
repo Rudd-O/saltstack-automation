@@ -1,27 +1,41 @@
 #!/usr/bin/bash -e
 
+data_basedir={{ data_basedir }}
+
 debug=
-if [ -n "$DEBUG" ; then
+if [ -n "$DEBUG" ] ; then
     debug=echo
 fi
 
 instance="$1"
 
 if [ -z "$instance" ] ; then
-    echo "Instance must be specified as the first parameter" >&2
-    ls -la /srv/plone
+    echo "Instance must be specified as the first parameter." >&2
+    echo "The second parameter may be the base instance to copy data from.." >&2
+    ls -la "$data_basedir"
     exit 64
 fi
 
-if ! test -d /srv/plone/"$instance"-green ; then
-    echo "Instance $instance does not exist in /srv/plone" >&2
-    ls -la /srv/plone
+if ! test -d "$data_basedir"/"$instance"-green ; then
+    echo "Instance $instance does not exist in $data_basedir" >&2
+    ls -la "$data_basedir"
     exit 2
 fi
 
-service container-plone-"$instance"-green stop || true
-cd /srv/plone
-rm -rf "$instance"-green/blobstorage
-cp -al master-green/blobstorage "$instance"-green/blobstorage
-cp -a master-green/filestorage "$instance"-green/filestorage
-service container-plone-"$instance"-green start
+base="$2"
+if [ -z "$base" ] ; then
+    base=master
+fi
+
+if ! test -d "$data_basedir"/"$base"-green ; then
+    echo "Instance $base does not exist in $data_basedir" >&2
+    ls -la "$data_basedir"
+    exit 2
+fi
+
+$debug service container-plone-"$instance"-green stop || true
+$debug cd "$data_basedir"
+$debug rm -rf "$instance"-green/blobstorage "$instance"-green/filestorage
+$debug cp -al "$base"-green/blobstorage "$instance"-green/blobstorage
+$debug cp -a "$base"-green/filestorage "$instance"-green/filestorage
+$debug service container-plone-"$instance"-green start

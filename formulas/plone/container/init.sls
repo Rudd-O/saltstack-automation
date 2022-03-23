@@ -40,6 +40,8 @@ def reqs():
         source="salt://" + sls.replace(".", "/") + "/reset-plone-instance",
         mode="0755",
         require_in=[sysreq],
+        template="jinja",
+        context={"data_basedir": quote(data_basedir)},
     )
 
     for name, user, home in [
