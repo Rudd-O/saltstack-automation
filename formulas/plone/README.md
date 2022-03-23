@@ -14,6 +14,11 @@ list of backends.
 The `container` formula sets up one or more Plone deployments with independent data folders.
 These are configured as dictionaries under the `plone:container:deployments` pillar.
 
+A command `reset-plone-instance` is provided which resets the data of any deployed Plone
+instance based on the data of any other Plone instance (by default `master`).  The name of
+the instance to reset must be provided as the first parameter, and the name of the base
+instance can be provided as the second parameter.
+
 ## Sample pillar for a complete Plone formula
 
 A machine that runs this formula could use the following pillar (listing some, non-exhaustive

@@ -33,6 +33,16 @@ if ! test -d "$data_basedir"/"$base"-green ; then
     exit 2
 fi
 
+if [ "$base" == "$instance" ] ; then
+    echo "Instance and base cannot be the same." >&2
+    exit 64
+fi
+
+if [ "$instance" == "master" ] ; then
+    echo "For data safety reasons, the master instance cannot be reset from another one." >&2
+    exit 4
+fi
+
 $debug service container-plone-"$instance"-green stop || true
 $debug cd "$data_basedir"
 $debug rm -rf "$instance"-green/blobstorage "$instance"-green/filestorage
