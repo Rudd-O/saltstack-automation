@@ -1,0 +1,27 @@
+#!/usr/bin/bash -e
+
+debug=
+if [ -n "$DEBUG" ; then
+    debug=echo
+fi
+
+instance="$1"
+
+if [ -z "$instance" ] ; then
+    echo "Instance must be specified as the first parameter" >&2
+    ls -la /srv/plone
+    exit 64
+fi
+
+if ! test -d /srv/plone/"$instance"-green ; then
+    echo "Instance $instance does not exist in /srv/plone" >&2
+    ls -la /srv/plone
+    exit 2
+fi
+
+service container-plone-"$instance"-green stop || true
+cd /srv/plone
+rm -rf "$instance"-green/blobstorage
+cp -al master-green/blobstorage "$instance"-green/blobstorage
+cp -a master-green/filestorage "$instance"-green/filestorage
+service container-plone-"$instance"-green start

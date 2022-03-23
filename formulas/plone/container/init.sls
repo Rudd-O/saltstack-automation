@@ -37,7 +37,7 @@ def reqs():
 
     File.managed(
         "/usr/local/bin/reset-plone-instance",
-        source="salt://" + sls.replace(".", "/") + "reset-plone-instance",
+        source="salt://" + sls.replace(".", "/") + "/reset-plone-instance",
         mode="0755",
         require_in=[sysreq],
     )
