@@ -144,16 +144,17 @@ def present(name, image, options=None, dryrun=False, enable=None):
             )
 
     if success():
-        unit = co("podman generate systemd --no-header".split() + [name], text=True)
+        if not __opts__["test"] or container_exists:
 
-        a(
-            _single(
-                "systemd service creation",
-                "file.managed",
-                name=unit_path,
-                contents=unit,
+            unit = co("podman generate systemd --no-header".split() + [name], text=True)
+            a(
+                _single(
+                    "systemd service creation",
+                    "file.managed",
+                    name=unit_path,
+                    contents=unit,
+                )
             )
-        )
 
         if success():
             if rets[-1]["changes"]:
