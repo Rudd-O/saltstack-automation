@@ -1,0 +1,29 @@
+{% load_yaml as default_logging -%}
+version: 1
+
+# In systemd's journal, loglevel is implicitly stored, so let's omit it
+# from the message text.
+formatters:
+    journal_fmt:
+        format: '%(name)s: [%(request)s] %(message)s'
+
+filters:
+    context:
+        (): synapse.logging.context.LoggingContextFilter
+        request: ""
+
+handlers:
+    journal:
+        class: systemd.journal.JournalHandler
+        formatter: journal_fmt
+        filters: [context]
+        SYSLOG_IDENTIFIER: synapse
+
+root:
+    level: INFO
+    handlers: [journal]
+
+disable_existing_loggers: False
+{% endload -%}
+{% set logging = salt["slsutil.merge"](default_logging, logging) -%}
+{{ logging | json }}

@@ -58,6 +58,17 @@ if not template():
         require=[Qubes('90-matrix-synapse')],
         watch_in=[Service("synapse")],
     )
+    File.managed(
+        confdir + "/log_config.yaml",
+        source="salt://matrix/synapse/log_config.yaml.j2",
+        template="jinja",
+        context={"logging": context.get("logging", {})},
+        mode="644",
+        user="root",
+        group="synapse",
+        require=[Qubes('90-matrix-synapse')],
+        watch_in=[Service("synapse")],
+    )
     Service.running(
         "synapse",
         enable=True,
