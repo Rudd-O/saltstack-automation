@@ -194,6 +194,27 @@ def deploy(i, n, data):
             ).requisite
         ]
 
+    elif "based_on" in data:
+
+        basedon = data["based_on"]
+        basedon_datadir = join(data_basedir, basedon + "-green")
+        based_on_green = f"plone-{basedon}-green"
+        File.directory(
+            f"{blue_datadir}",
+            user=user,
+            mode="0755",
+            require=[sysreq],
+            unless="test -d %s" % quote(blue_datadir),
+        )
+        co = [
+            copy_over(
+                basedon_datadir,
+                blue_datadir,
+                require=[Podman(f"start {based_on_green}")],
+            ).requisite,
+            File(f"{blue_datadir}"),
+        ]
+
     else:
 
         co = []
@@ -202,7 +223,7 @@ def deploy(i, n, data):
             user=user,
             mode="0755",
             require=[sysreq],
-            unless="test -d %s" % quote(nc_blue),
+            unless="test -d %s" % quote(blue_datadir),
         ):
             for x in ["/filestorage", "/blobstorage"]:
                 File.directory(
@@ -283,16 +304,6 @@ for i, (deployment_name, deployment_data) in enumerate(deployments.items()):
 
 """
 {#
-
-{%     endfor %}
-
-{{ deployment_data_dir }}:
-  file.absent
-
-{{ deployment_target_dir }}:
-  file.absent
-
-{%   else %}
 
 test {{ deployment_name }}:
 {%     if deployment_data.get("unit_test_name") %}
