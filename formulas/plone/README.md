@@ -75,6 +75,9 @@ supported settings are:
 
 * `image`: defines the container image that will be used to deploy
   Plone.  Images are expected to expose TCP port 8080.
+* `based_on`: when dealing with new deployments, initialize the
+  data for this deployment based on the named deployment.
+* `delete`: if mentioned, delete all traces of the deployment.
 * (there are other undocumented settings at this time)
 
 All deployments are accessible directly under URL
