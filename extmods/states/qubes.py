@@ -199,7 +199,9 @@ def dom0_uptodate(name):
     )
     if ret["result"] in (True, None):
         rex = "Upgrade.*Packages|Installing:|Removing:|Upgrading:|Updating:"
-        if re.search(rex, ret["stdout"] + ret["stderr"]):
+        text = ret.get("changes", {}).get("stdout", "")
+        text += ret.get("changes", {}).get("stderr", "")
+        if re.search(rex, text):
             pass
         else:
             ret["changes"] = {}
