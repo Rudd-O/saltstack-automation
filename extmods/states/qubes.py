@@ -2,6 +2,7 @@
 Various states to help with deployment on Qubes VMs.
 """
 
+import re
 import os
 
 try:
