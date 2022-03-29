@@ -188,3 +188,18 @@ ConditionPathExists=/var/run/qubes-service/%s
             ),
         },
     )
+
+
+def dom0_uptodate(name):
+    ret = _single(
+        name,
+        "cmd.run",
+        name="qubes-dom0-update -y",
+    )
+    if ret["result"] in (True, None):
+        rex = "Upgrade.*Packages|Installing:|Removing:|Upgrading:|Updating:"
+        if re.search(rex, ret["stdout"] + ret["stderr"]):
+            pass
+        else:
+            ret["changes"] = {}
+    return ret
