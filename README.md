@@ -14,7 +14,7 @@ The formulas generally require you deploy the extension modules under [`extmods`
 Formulas are under [`formulas`](formulas/).  Here is an overview:
 
 * [Matrix](formulas/matrix/) helps you set up a self-contained federated Matrix Synapse instance with VoIP signaling support.  To learn more about how to use this formula, [see the guide](https://rudd-o.com/linux-and-free-software/matrix-in-a-box).
-
+* [Wireguard](formulas/wireguard/) sets up simple wg-quick Wireguard networks among multiple hosts.  You can set up more than one.  See the `README.md` file in that directory.
 ## License
 
 The code contained within is licensed under the GNU GPL v2.
