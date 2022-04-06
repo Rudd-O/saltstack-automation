@@ -13,7 +13,7 @@ include("letsencrypt")
 deps = []
 if fully_persistent_or_physical():
     with Pkg.installed("coturn"):
-    	Qubes.enable_dom0_managed_service("coturn")
+        Qubes.enable_dom0_managed_service("coturn")
     Cmd.wait(
         "reload systemd",
         name="systemctl --system daemon-reload",
@@ -45,6 +45,7 @@ if fully_persistent_or_physical():
     Qubes.enable_dom0_managed_service(
         "coturn-update-external-ip",
         watch_in=[Cmd("reload systemd")],
+        require=[File("/etc/systemd/system/coturn-update-external-ip.service")],
     )
 else:
     pass
