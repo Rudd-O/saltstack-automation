@@ -73,7 +73,8 @@ if not template():
                     quoted_host = quote(host)
                     cmd = f"certbot certonly -m {quoted_renewal_email} --agree-tos --webroot -w {quoted_webroot} -d {quoted_host}"
                     if account_number:
-                        cmd = "set -o pipefail ; echo {{ account_number }} | " + cmd
+                        quoted_account_number = quote(str(account_number))
+                        cmd = f"set -o pipefail ; echo {quoted_account_number} | " + cmd
                 else:
                     C = Cmd.wait
                     cmd = "echo Certificates are already generated"
