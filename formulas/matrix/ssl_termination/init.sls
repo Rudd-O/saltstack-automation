@@ -17,6 +17,13 @@ if not template():
     key = privkey_path(delegated_hostname)
 
     if physical():
+        Selinux.port_policy_present(
+            "httpd_can_listen_to_8448",
+            sel_type="http_port_t",
+            protocol="tcp",
+            port=8448,
+            require_in=[Service("nginx")],
+        )
         Selinux.boolean(
             "httpd_can_network_relay",
             value=True,
