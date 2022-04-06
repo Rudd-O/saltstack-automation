@@ -20,7 +20,6 @@ if fully_persistent_or_physical():
     )
     deps.extend([
        Qubes("coturn"),
-       Qubes("coturn-update-external-ip"),
     ])
     for typ in [".service", ".timer", ""]:
         if typ:
@@ -47,6 +46,9 @@ if fully_persistent_or_physical():
         watch_in=[Cmd("reload systemd")],
         require=[File("/etc/systemd/system/coturn-update-external-ip.service")],
     )
+    deps.extend([
+       Qubes("coturn-update-external-ip"),
+    ])
 else:
     pass
 
