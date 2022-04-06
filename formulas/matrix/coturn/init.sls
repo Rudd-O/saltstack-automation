@@ -10,6 +10,7 @@ from salt://lib/letsencrypt.sls import privkey_path, fullchain_path, certificate
 include("letsencrypt")
 
 
+deps = []
 if fully_persistent_or_physical():
     with Pkg.installed("coturn"):
     	Qubes.enable_dom0_managed_service("coturn")
@@ -17,6 +18,10 @@ if fully_persistent_or_physical():
         "reload systemd",
         name="systemctl --system daemon-reload",
     )
+    deps.extend([
+       Qubes("coturn"),
+       Qubes("coturn-update-external-ip"),
+    ])
     for typ in [".service", ".timer", ""]:
         if typ:
             f = "/etc/systemd/system/coturn-update-external-ip%s" % typ
@@ -41,12 +46,8 @@ if fully_persistent_or_physical():
         "coturn-update-external-ip",
         watch_in=[Cmd("reload systemd")],
     )
-    deps = [
-    	Qubes("coturn"),
-    	Qubes("coturn-update-external-ip"),
-    ]
 else:
-    deps = []
+    pass
 
 if not template():
     context = pillar("matrix:coturn", {})
