@@ -1,5 +1,7 @@
 #!objects
 
+from shlex import quote
+
 from salt://lib/qubes.sls import template, fully_persistent_or_physical
 from salt://lib/letsencrypt.sls import certbot_webroot, certbot_live, certificate_dir, fullchain_path, privkey_path
 
@@ -62,14 +64,16 @@ if not template():
                 renewal_email = data.get("renewal_email", default_renewal_email)
                 if not renewal_email:
                     raise KeyError("a renewal_email is needed by default in letsencrypt pillar or for the host")
+                account_number = data.get("account_number", None)
 
                 if not (salt.file.file_exists(cert) and salt.file.file_exists(key)):
                     C = Cmd.run
-                    cmd = "certbot certonly -m %s --agree-tos --webroot -w %s -d %s" % (
-                        salt.text.quote(renewal_email),
-                        salt.text.quote(certbot_webroot),
-                        salt.text.quote(host),
-                    )
+                    quoted_renewal_email = quote(renewal_email)
+                    quoted_webroot = quote(certbot_webroot)
+                    quoted_host = quote(host)
+                    cmd = f"certbot certonly -m {quoted_renewal_email} --agree-tos --webroot -w {quoted_webroot} -d {quoted_host}"
+                    if account_number:
+                        cmd = "set -o pipefail ; echo {{ account_number }} | " + cmd
                 else:
                     C = Cmd.wait
                     cmd = "echo Certificates are already generated"

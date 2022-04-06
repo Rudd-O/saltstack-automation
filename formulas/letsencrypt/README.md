@@ -24,3 +24,13 @@ letsencrypt:
     example.com:
       fake: true
 ```
+
+When your host has multiple accounts, Let's Encrypt's `certbot` will abort with a
+prompt demanding to select which account to use.  Bypass the prompt thus:
+
+```
+letsencrypt:
+  hosts:
+    example.org:
+      account_number: 1
+```
