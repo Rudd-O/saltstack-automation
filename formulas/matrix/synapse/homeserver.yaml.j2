@@ -723,6 +723,9 @@ retention:
 # purely on this application-layer restriction.  If not specified, the
 # default is to whitelist everything.
 #
+{% if federation_domain_whitelist is defined -%}
+federation_domain_whitelist: {{ federation_domain_whitelist | json }}
+{% endif -%}
 #federation_domain_whitelist:
 #  - lon.example.com
 #  - nyc.example.com
