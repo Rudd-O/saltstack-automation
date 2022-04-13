@@ -33,12 +33,12 @@ def policy_module_present(name, source):
 set -e
 cd /etc/selinux/targeted/local
 (
-    rm -f %(qfname).mod
-    checkmodule -M -m -o %(qfname).mod %(qfname).te
-    semodule_package -o %(qfname).pp -m %(qfname).mod
+    rm -f %(qfname)s.mod
+    checkmodule -M -m -o %(qfname)s.mod %(qfname)s.te
+    semodule_package -o %(qfname)s.pp -m %(qfname)s.mod
 ) || {
     r=$?
-    rm -f %(qfname).te
+    rm -f %(qfname)s.te
     exit $?
 }
 """
