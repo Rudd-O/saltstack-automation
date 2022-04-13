@@ -41,6 +41,14 @@ if fully_persistent_or_physical():
                 "coturn-update-external-ip%s" % typ,
                 require=deps[-1],
             )
+    File.managed(
+        "/etc/systemd/system/coturn.service.d/restart.conf",
+        source="salt://matrix/coturn/restart.conf",
+        makedirs=True,
+        mode="0644",
+        watch_in=[Cmd("reload systemd")],
+    )
+    deps.append(File("/etc/systemd/system/coturn.service.d/restart.conf"))
     Qubes.enable_dom0_managed_service(
         "coturn-update-external-ip",
         watch_in=[Cmd("reload systemd")],
