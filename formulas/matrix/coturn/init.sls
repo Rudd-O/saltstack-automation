@@ -11,16 +11,22 @@ include("letsencrypt")
 
 
 deps = []
+restartwatch = []
+restartrequire = []
+
 if fully_persistent_or_physical():
     with Pkg.installed("coturn"):
         Qubes.enable_dom0_managed_service("coturn")
+    deps.extend([
+       Qubes("coturn"),
+    ])
+
     Cmd.wait(
         "reload systemd",
         name="systemctl --system daemon-reload",
     )
-    deps.extend([
-       Qubes("coturn"),
-    ])
+    restartrequire.append(Cmd("reload systemd"))
+
     for typ in [".service", ".timer", ""]:
         if typ:
             f = "/etc/systemd/system/coturn-update-external-ip%s" % typ
@@ -49,6 +55,8 @@ if fully_persistent_or_physical():
         watch_in=[Cmd("reload systemd")],
     )
     deps.append(File("/etc/systemd/system/coturn.service.d/restart.conf"))
+    restartwatch.append(File("/etc/systemd/system/coturn.service.d/restart.conf"))
+
     Qubes.enable_dom0_managed_service(
         "coturn-update-external-ip",
         watch_in=[Cmd("reload systemd")],
@@ -125,7 +133,8 @@ if not template():
         watch=[
             Cmd("Set coturn ACL for certificates"),
             File("/etc/coturn/turnserver.conf"),
-        ],
+        ] + restartwatch,
+        require=restartrequire,
     )
     # Create renewal hook to restart coturn.
     File.managed(
