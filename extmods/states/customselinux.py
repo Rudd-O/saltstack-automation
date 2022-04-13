@@ -21,7 +21,7 @@ def policy_module_present(name, source):
         _single(
             f"Deploy policy module {fname}",
             "file.managed",
-            f"/etc/selinux/targeted/local/{fname}.te",
+            name=f"/etc/selinux/targeted/local/{fname}.te",
             makedirs=True,
             source=source,
         )
@@ -56,6 +56,7 @@ cd /etc/selinux/targeted/local
             _single(
                 f"Install policy module {fname}",
                 "selinux.module",
+                name=fname,
                 install=True,
                 source=f"/etc/selinux/targeted/local/{fname}.pp",
             )
