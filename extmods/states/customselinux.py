@@ -52,15 +52,16 @@ cd /etc/selinux/targeted/local
             )
         )
     if success():
-        a(
-            _single(
-                f"Install policy module {fname}",
-                "selinux.module",
-                name=fname,
-                install=True,
-                source=f"/etc/selinux/targeted/local/{fname}.pp",
+        if not __opts__["test"]:
+            a(
+                _single(
+                    f"Install policy module {fname}",
+                    "selinux.module",
+                    name=fname,
+                    install=True,
+                    source=f"/etc/selinux/targeted/local/{fname}.pp",
+                )
             )
-        )
     else:
         _single(
             f"Remove bad modules",
