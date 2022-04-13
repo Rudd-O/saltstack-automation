@@ -9,6 +9,7 @@
 
 include:
 - .set_backend
+- .pkg
 
 reload systemd for varnish:
   cmd.run:
@@ -16,10 +17,10 @@ reload systemd for varnish:
   - onchanges: []
 
 varnish:
-  pkg.installed: []
   service.running:
   - enable: true
   - require:
+    - pkg: varnish
     - cmd: reload systemd for varnish
 
 {% if salt['grains.get']("qubes:vm_type", "") == "" %}

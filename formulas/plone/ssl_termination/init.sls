@@ -15,12 +15,7 @@ if not template():
     backend = context.get("backend", "127.0.0.1:6081")
 
     if physical():
-        Selinux.boolean(
-            "httpd_can_network_relay for Plone",
-            name="httpd_can_network_relay",
-            value=True,
-            require_in=[Service("nginx")],
-        )
+        include("plone.ssl_termination.selinux")
 
     server_names = context.get("server_names", [context.get("server_name", "None")])
     if server_names[0] == None:

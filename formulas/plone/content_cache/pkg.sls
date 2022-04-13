@@ -1,0 +1,2 @@
+varnish:
+  pkg.installed: []
