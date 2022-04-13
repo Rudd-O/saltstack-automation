@@ -1,9 +1,14 @@
-{% from 'lib/selinux.sls' import selinux_module %}
-
-{{ selinux_module('nginxvarnish', 'salt://' + (sls.split(".")[:-1] | join("/")) + '/nginxvarnish.te') }}
-
 include:
 - plone.content_cache.pkg
+- nginx
+
+nginxvarnish:
+  customselinux.policy_module_present:
+  - source: salt://{{ sls.split(".")[:-1] | join("/") }}/nginxvarnish.te
+  - require_in:
+    - service: nginx
+  - require:
+    - pkg: varnish
 
 httpd_can_network_relay for Plone:
   selinux.boolean:
