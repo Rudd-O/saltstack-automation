@@ -16,7 +16,8 @@ if not template():
 
     if physical():
         Selinux.boolean(
-            "httpd_can_network_relay",
+            "httpd_can_network_relay for Plone",
+            name="httpd_can_network_relay",
             value=True,
             require_in=[Service("nginx")],
         )

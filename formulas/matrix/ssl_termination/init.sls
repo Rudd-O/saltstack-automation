@@ -25,7 +25,8 @@ if not template():
             require_in=[Service("nginx")],
         )
         Selinux.boolean(
-            "httpd_can_network_relay",
+            "httpd_can_network_relay for Matrix",
+            name="httpd_can_network_relay",
             value=True,
             require_in=[Service("nginx")],
         )
