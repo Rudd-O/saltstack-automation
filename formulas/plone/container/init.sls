@@ -5,6 +5,9 @@ import json
 from os.path import join
 from shlex import quote
 
+from salt://lib/qubes.sls import template
+
+
 include("plone.content_cache.set_backend")
 
 if pillar("build:repo:client", ""):
@@ -35,14 +38,15 @@ def reqs():
         require_in=[sysreq],
     )
 
-    File.managed(
-        "/usr/local/bin/reset-plone-instance",
-        source="salt://" + sls.replace(".", "/") + "/reset-plone-instance",
-        mode="0755",
-        require_in=[sysreq],
-        template="jinja",
-        context={"data_basedir": quote(data_basedir)},
-    )
+    if not template():
+        File.managed(
+            "/usr/local/bin/reset-plone-instance",
+            source="salt://" + sls.replace(".", "/") + "/reset-plone-instance",
+            mode="0755",
+            require_in=[sysreq],
+            template="jinja",
+            context={"data_basedir": quote(data_basedir)},
+        )
 
     for name, user, home in [
         (
@@ -82,6 +86,13 @@ def reqs():
         group=user,
         require=[User("process user %s" % user)],
         require_in=[sysreq],
+    )
+
+    Qubes.bind_dirs(
+        "plone-container",
+        directories=[data_basedir],
+        require_in=[sysreq],
+        require=[File(data_basedir)],
     )
 
     return sysreq
@@ -292,6 +303,14 @@ def deploy(i, n, data):
     Podman.dead(f"stop {nc_blue} again", name=nc_blue, require=[failover_to_green])
 
 
+# FIXME FOR QUBES SUPPORT
+# Something here must say "if not template()" and use that to decide
+# whether to run the deploy or not (we assume the template is not where
+# we want that thing).  This also probably means we need to figure out a
+# way to enable the container services under the Qubes AppVM that does not
+# involve going all the way back to the template to configure the services.
+# Also need to bind_dirs the directories where the container data is stored,
+# otherwise the containers will have serious trouble restarting after reboot.
 for i, (deployment_name, deployment_data) in enumerate(deployments.items()):
     if deployment_name not in limit_to:
         continue
