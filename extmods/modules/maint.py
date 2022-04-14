@@ -67,7 +67,7 @@ def restart_services(test=False):
     for svc in svcs["restartable"]:
         if svc not in res["failed"]:
             if is_service_failed(svc):
-                res["failed"].append(svc)
+                res["failed"][svc] = "Service is failed."
     res["nonrestartable"] = svcs["nonrestartable"]
     return res
 
