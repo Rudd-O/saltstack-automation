@@ -11,8 +11,9 @@ instance="$1"
 
 if [ -z "$instance" ] ; then
     echo "Instance must be specified as the first parameter." >&2
-    echo "The second parameter may be the base instance to copy data from.." >&2
-    ls -la "$data_basedir"
+    echo "The second parameter may be the base instance to copy data from." >&2
+    echo "Instances available (disregard '-green' and '-blue' suffixes):" >&2
+    ls -l "$data_basedir"
     exit 64
 fi
 
@@ -34,13 +35,16 @@ if ! test -d "$data_basedir"/"$base"-green ; then
 fi
 
 if [ "$base" == "$instance" ] ; then
-    echo "Instance and base cannot be the same." >&2
+    echo "Instance ($instance) and base ($base) cannot be the same." >&2
     exit 64
 fi
 
-if [ "$instance" == "master" ] ; then
-    echo "For data safety reasons, the master instance cannot be reset from another one." >&2
-    exit 4
+if [ "$FORCE" != "1" ] ; then
+    if [ "$instance" == "master" ] ; then
+        echo "For data safety reasons, the master instance cannot be reset from another one." >&2
+        echo "If you still want to reset it, set and export variable FORCE to 1." >&2
+        exit 4
+    fi
 fi
 
 $debug service container-plone-"$instance"-green stop || true
