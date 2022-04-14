@@ -1,2 +1,4 @@
-varnish:
-  pkg.installed: []
+varnishpkg:
+  pkg.installed:
+  - name: varnish
+

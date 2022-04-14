@@ -20,7 +20,7 @@ varnish:
   service.running:
   - enable: true
   - require:
-    - pkg: varnish
+    - pkg: varnishpkg
     - cmd: reload systemd for varnish
 
 {% if salt['grains.get']("qubes:vm_type", "") == "" %}
@@ -28,7 +28,7 @@ varnishd_connect_any:
   selinux.boolean:
   - value: true
   - require:
-    - pkg: varnish
+    - pkg: varnishpkg
   - require_in:
     - service: varnish
 {% endif %}
@@ -70,7 +70,7 @@ reload varnish:
   - exclude_pat:
     - 50-backends.vcl
   - require:
-    - pkg: varnish
+    - pkg: varnishpkg
   - require_in:
     - service: varnish
     - cmd: /etc/varnish/plone/default.vcl
@@ -83,7 +83,7 @@ reload varnish:
   file.managed:
   - source: salt://{{ sls.replace(".", "/") }}/vcl/50-backends.vcl
   - require:
-    - pkg: varnish
+    - pkg: varnishpkg
     - file: /etc/varnish/plone
   - onchanges_in:
     - cmd: reload varnish

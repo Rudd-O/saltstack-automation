@@ -8,7 +8,7 @@ nginxvarnish:
   - require_in:
     - service: nginx
   - require:
-    - pkg: varnish
+    - pkg: varnishpkg
 
 httpd_can_network_relay for Plone:
   selinux.boolean:
@@ -18,4 +18,4 @@ httpd_can_network_relay for Plone:
     - service: nginx
   - require:
     - pkg: nginx
-    - pkg: varnish
+    - pkg: varnishpkg
