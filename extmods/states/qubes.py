@@ -36,6 +36,9 @@ def bind_dirs(name, directories):
 
     Only has an effect on AppVMs with volatile root file systems.
 
+    Always create the folder or file before binding.  That is, this state
+    must depend on the files it will be binding.
+
     See https://www.qubes-os.org/doc/bind-dirs/ for more information.
     """
     if not hasattr(directories, "append"):
@@ -101,7 +104,8 @@ def bind_dirs(name, directories):
 
     if ret2["changes"] or any(not os.path.ismount(d) for d in directories):
         ret3 = _single(
-            "bind-dirs.sh" "cmd.run",
+            "bind-dirs.sh",
+            "cmd.run",
             name="/usr/lib/qubes/init/bind-dirs.sh",
         )
 
