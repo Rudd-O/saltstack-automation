@@ -41,13 +41,13 @@ def installed(name, pkgs=None):
                     "result": None,
                     "comment": "Packages %s would be installed." % ", ".join(missing),
                 }
-            else:
-                return {
-                    "name": name,
-                    "changes": {},
-                    "result": True,
-                    "comment": "All packages are already installed.",
-                }
+        if not missing:
+            return {
+                "name": name,
+                "changes": {},
+                "result": True,
+                "comment": "All packages are already installed.",
+            }
         p = subprocess.Popen(
             ["qubes-dom0-update", "-y"] + missing,
             stdout=subprocess.PIPE,
