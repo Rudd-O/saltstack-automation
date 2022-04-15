@@ -26,28 +26,42 @@ def _single(subname, *args, **kwargs):
     return ret
 
 
-def installed(name, pkgs=None):
+def installed(name, pkgs=None, version=None):
     if os.access("/usr/bin/qubes-dom0-update", os.X_OK):
         before = _rpmlist()
         pkgs = pkgs or [name]
-        missing = [p for p in pkgs if not p in before]
-        if __opts__["test"]:
-            if missing:
-                return {
-                    "name": name,
-                    "changes": {
-                        "installed": missing,
-                    },
-                    "result": None,
-                    "comment": "Packages %s would be installed." % ", ".join(missing),
-                }
-        if not missing:
+        if version is not None and len(pkgs) != 1:
             return {
                 "name": name,
                 "changes": {},
-                "result": True,
-                "comment": "All packages are already installed.",
+                "result": False,
+                "comment": "A version cannot be specified when requesting more than one package to install.",
             }
+
+        if version is None:
+            # Optimize the common case.
+            missing = [p for p in pkgs if not p in before]
+            if __opts__["test"]:
+                if missing:
+                    return {
+                        "name": name,
+                        "changes": {
+                            "installed": missing,
+                        },
+                        "result": None,
+                        "comment": "Packages %s would be installed."
+                        % ", ".join(missing),
+                    }
+            if not missing:
+                return {
+                    "name": name,
+                    "changes": {},
+                    "result": True,
+                    "comment": "All packages are already installed.",
+                }
+        else:
+            missing = [pkgs[0] + "-" + version]
+
         p = subprocess.Popen(
             ["qubes-dom0-update", "-y"] + missing,
             stdout=subprocess.PIPE,
