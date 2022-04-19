@@ -107,6 +107,11 @@ def render(template, saltenv="base", sls="", salt_data=True, **kwargs):
     _globals["include"] = Registry.include
     _globals["extend"] = Registry.make_extend
 
+    # Salt object for Salt.state.
+    _globals["Salt"] = StateFactory("salt")
+    _globals["Test"] = StateFactory("test")
+    _globals["SLS"] = StateFactory("sls")
+
     # add the name of the SLS (not available in pyobjects, but
     # available in the Jinja renderer)
     _globals["sls"] = sls
@@ -120,6 +125,7 @@ def render(template, saltenv="base", sls="", salt_data=True, **kwargs):
     try:
         _globals.update(
             {
+                # Magical SLS dependency object.
                 # salt, pillar & grains all provide shortcuts or object interfaces
                 "salt": SaltObject(__salt__),
                 "pillar": __salt__["pillar.get"],
