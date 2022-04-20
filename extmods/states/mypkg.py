@@ -120,6 +120,11 @@ def _dom0_uptodate(name):
         "cmd.run",
         name="qubes-dom0-update -y",
     )
+    ret["comment"] = (
+        ret["comment"]
+        + "\n\nStdout:\n%s" % ret.get("changes", {}).get("stdout", "")
+        + "\n\nStderr:\n%s" % ret.get("changes", {}).get("stderr", "")
+    )
     if ret["result"] in (True, None):
         rex = "Upgrade.*Packages|Installing:|Removing:|Upgrading:|Updating:"
         text = ret.get("changes", {}).get("stdout", "")
@@ -133,6 +138,6 @@ def _dom0_uptodate(name):
 
 def uptodate(name):
     if os.access("/usr/bin/qubes-dom0-update", os.X_OK):
-        _dom0_uptodate(name)
+        return _dom0_uptodate(name)
     else:
         return __states__["pkg.uptodate"](name=name)
