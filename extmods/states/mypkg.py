@@ -22,7 +22,10 @@ def _rpmlist():
 
 def _single(subname, *args, **kwargs):
     ret = __salt__["state.single"](*args, **kwargs)
-    ret = list(ret.values())[0]
+    try:
+        ret = list(ret.values())[0]
+    except AttributeError:
+        assert 0, ret
     ret["name"] = subname
     return ret
 
