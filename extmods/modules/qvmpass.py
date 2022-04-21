@@ -91,6 +91,8 @@ def get(key, create=True):
 
 def get_multiline(key):
     a = ["qvm-pass"]
+    if not (hasattr(key, "decode") or hasattr(key, "encode")):
+        key = os.path.sep.join(key)
     a.append("--")
     a.append(key)
     return cmd_with_serialization(["qvm-pass", key], universal_newlines=True, bufsize=0)
