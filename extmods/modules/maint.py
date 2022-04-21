@@ -6,6 +6,11 @@ exclude_services = [
     "dbus.service",
     "auditd.service",
     "systemd-logind.service",
+    "xenstored.service",  # Breaks Xen.
+    "xenconsoled.service",  # Breaks Xen consoles.
+    "qubes-db-dom0.service",  # Breaks Qubes OS.
+    "sddm.service",  # Logs out current session.
+    "kdm.service",  # Logs out current session.
     "^getty@",
     "^user@",
     ".+scope$",
