@@ -118,18 +118,22 @@ def QubesService(vm_name, services, require=None, onchanges=None, require_in=Non
     require_in = require_in or []
     fname = 'Enable services ' + ", ".join(services) + ' on ' + vm_name + ' in ' + dom0
 
-    Salt.state(
-        fname,
-        tgt=dom0,
-        tgt_type='list',
-        sls='orch.lib.qubes.qvm-service',
-        pillar={"services": services, "vm_name": vm_name},
-        ssh=True,
-        require=require,
-        onchanges=onchanges,
-        require_in=require_in,
-    )
-    return Salt(fname)
+    if not pillar('skip_dom0s'):
+        Salt.state(
+            fname,
+            tgt=dom0,
+            tgt_type='list',
+            sls='orch.lib.qubes.qvm-service',
+            pillar={"services": services, "vm_name": vm_name},
+            ssh=True,
+            require=require,
+            onchanges=onchanges,
+            require_in=require_in,
+        )
+        return Salt(fname)
+    else:
+        Test.nop(fname)
+        return Test(fname)
 
 
 def BindDirs(name, directories, require=None):
