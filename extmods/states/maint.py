@@ -3,7 +3,7 @@ def services_restarted(name):
     ret = dict(name=name, result=False, changes={}, comment="")
     r = __salt__["maint.restart_services"](test=test)
     k = __salt__["maint.get_kernel_reboot_required"]()
-    comment = []
+    comment = ["needs-restart report:\n" + r["report"]]
     if r["failed"]:
         comment.append(
             "Failed services:\n%s"

@@ -28,18 +28,17 @@ def get_services_that_need_restart():
     needsrestart = ["needs-restart", "-b"]
     for p in exclude_paths:
         needsrestart.extend(["-i", p])
-    svcs = [
-        s
-        for s in subprocess.check_output(
-            needsrestart, universal_newlines=True
-        ).splitlines()
-        if s
-    ]
+    needsrestartoutput = subprocess.check_output(needsrestart, universal_newlines=True)
+    needsrestartreport = subprocess.check_output(
+        ["needs-restart"], universal_newlines=True
+    )
+    svcs = [s for s in needsrestartoutput.splitlines() if s]
     restartable = [s for s in svcs if not re.match("|".join(exclude_services), s)]
     nonrestartable = [s for s in svcs if re.match("|".join(exclude_services), s)]
     return {
         "restartable": restartable,
         "nonrestartable": nonrestartable,
+        "report": needsrestartreport.rstrip(),
     }
 
 
@@ -53,11 +52,12 @@ def is_service_failed(svc):
 
 
 def restart_services(test=False):
+    svcs = get_services_that_need_restart()
     res = {
         "restarted": [],
         "failed": collections.OrderedDict(),
+        "report": svcs["report"],
     }
-    svcs = get_services_that_need_restart()
     for svc in svcs["restartable"]:
         restart = ([] if not test else ["echo"]) + [
             "systemctl",
