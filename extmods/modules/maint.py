@@ -1,4 +1,5 @@
 import collections
+import os
 import re
 import subprocess
 
@@ -74,7 +75,19 @@ def restart_services(test=False):
             if is_service_failed(svc):
                 res["failed"][svc] = "Service is failed."
     res["nonrestartable"] = svcs["nonrestartable"]
+    with open(os.devnull, "a") as f:
+        # Optimistically run the unit state collector, ignoring errors.
+        subprocess.call(
+            "systemctl --system start --no-block systemd-unit-state-collector".split(),
+            stdin=None,
+            stdout=f,
+            stderr=f,
+        )
     return res
+
+
+def get_nonrestartable_services_and_paths():
+    return exclude_services, exclude_paths
 
 
 def get_kernel_reboot_required():
