@@ -118,7 +118,7 @@ def QubesService(vm_name, services, require=None, onchanges=None, require_in=Non
     require_in = require_in or []
     fname = 'Enable services ' + ", ".join(services) + ' on ' + vm_name + ' in ' + dom0
 
-    if not pillar('skip_dom0s'):
+    if not pillar('skip_dom0s') and dom0:
         Salt.state(
             fname,
             tgt=dom0,
