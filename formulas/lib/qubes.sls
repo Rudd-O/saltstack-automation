@@ -107,8 +107,6 @@ def ShutoffVm(vm_name, require=None, onchanges=None, role=None):
 def QubesService(vm_name, services, require=None, onchanges=None, require_in=None):
     if type(services) is not list and type(services) is not tuple:
         services = [services]
-    # FIXME: make a roster.sls helper for qubes dom0s,
-    # because this snippet is repeated in the codebase.
     dom0 = Dom0(vm_name)
     # FIXME: make the update roster program generate a table of vm_names instead
     # of hardcoding here a period.
