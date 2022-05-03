@@ -1,6 +1,7 @@
 #!pyobjects
 
 from salt://lib/defs.sls import Perms
+from salt://lib/roster.sls import Dom0
 
 try:
     from shlex import quote
@@ -69,14 +70,13 @@ ConditionPathExists=/var/run/qubes-service/%s
 
 def RpcPolicy(name, contents):
     n = "/etc/qubes-rpc/policy/" + name
-    File.managed(
+    return File.managed(
         n,
         contents=contents,
         user="root",
         group="qubes",
         **Perms.dir
-    )
-    return File(n)
+    ).requisite
 
 
 def ShutoffVm(vm_name, require=None, onchanges=None, role=None):
@@ -84,7 +84,7 @@ def ShutoffVm(vm_name, require=None, onchanges=None, role=None):
     # no longer using Salt.function to make it stateful.
     require = require or []
     onchanges = onchanges or []
-    dom0 = pillar('qubes:dom0s:%s' % vm_name)
+    dom0 = Dom0(vm_name)
     vm_name = vm_name.split(".")[0]
     assert dom0, (vm_name, dom0)
     fname = 'Shutoff ' + vm_name + ' in ' + dom0
@@ -109,17 +109,18 @@ def QubesService(vm_name, services, require=None, onchanges=None, require_in=Non
         services = [services]
     # FIXME: make a roster.sls helper for qubes dom0s,
     # because this snippet is repeated in the codebase.
-    dom0 = pillar('qubes:dom0s:%s' % vm_name)
+    dom0 = Dom0(vm_name)
     # FIXME: make the update roster program generate a table of vm_names instead
     # of hardcoding here a period.
     vm_name = vm_name.split(".")[0]
     require = require or []
     onchanges = onchanges or []
     require_in = require_in or []
-    fname = 'Enable services ' + ", ".join(services) + ' on ' + vm_name + ' in ' + dom0
+    snames = ", ".join(services)
+    fname = f"Enable services {snames} on {vm_name} in {dom0}"
 
     if not pillar('skip_dom0s') and dom0:
-        Salt.state(
+        req = Salt.state(
             fname,
             tgt=dom0,
             tgt_type='list',
@@ -129,11 +130,11 @@ def QubesService(vm_name, services, require=None, onchanges=None, require_in=Non
             require=require,
             onchanges=onchanges,
             require_in=require_in,
-        )
+        ).requisite
         return Salt(fname)
     else:
-        Test.nop(fname)
-        return Test(fname)
+        req = Test.nop(fname).requisite
+    return req
 
 
 def BindDirs(name, directories, require=None):
