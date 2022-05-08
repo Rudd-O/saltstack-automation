@@ -1,15 +1,17 @@
 #!objects
 
 from shlex import quote
+from os.path import dirname
 
 from salt://lib/qubes.sls import template, fully_persistent_or_physical
-from salt://lib/letsencrypt.sls import certbot_webroot, certbot_live, certificate_dir, fullchain_path, privkey_path
+from salt://lib/letsencrypt.sls import certbot_webroot, certbot_live, certificate_dir, fullchain_path, privkey_path, renewal_hook
 
 
 include("nginx")
 
 
 if fully_persistent_or_physical():
+    Pkg.installed("ca-certificates", require_in=[Pkg("certbot")]),
     with Pkg.installed("certbot"):
         Qubes.enable_dom0_managed_service("certbot-renew", enable=False)
         Service.enabled("certbot-renew.timer")
@@ -21,7 +23,6 @@ if not template():
     context = pillar("letsencrypt", {})
     default_renewal_email = context.get("renewal_email")
     default_fake = context.get("fake", False)
-    fakes = []
 
     if "hosts" not in context or not context["hosts"]:
 
@@ -34,10 +35,15 @@ if not template():
 
         hosts = context["hosts"]
     
+        File.directory(
+            dirname(certbot_webroot),
+            require=deps,
+            require_in=[Qubes("90-matrix-certbot")],
+            makedirs=True,
+        )
         with Qubes.bind_dirs(
             '90-matrix-certbot',
-            directories=['/etc/letsencrypt'],
-            require=deps,
+            directories=[dirname(certbot_webroot)],
         ):
             File.directory(
                 certbot_webroot,
@@ -47,7 +53,6 @@ if not template():
 
         for host, data in hosts.items():
             fake = data.get("fake", default_fake)
-            fakes.append(fake)
 
             cert = fullchain_path(host)
             key = privkey_path(host)
@@ -92,19 +97,4 @@ if not template():
         require_in=[Service("nginx")],
     )
 
-    if all(fakes):
-        File.absent(
-            "/etc/letsencrypt/renewal-hooks/post/nginx",
-        )
-    else:
-        # Create renewal hook to reload NginX.
-        File.managed(
-            "/etc/letsencrypt/renewal-hooks/post/nginx",
-            contents="""
-#!/bin/bash -e
-systemctl reload nginx.service
-            """.strip(),
-            mode="0755",
-            makedirs=True,
-            require=[Service("nginx")],
-        )
+    renewal_hook("nginx")

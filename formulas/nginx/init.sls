@@ -48,6 +48,6 @@ if not template():
     Cmd.run(
         "reload nginx",
         name="systemctl --system reload nginx.service",
-        onchanges=[],
+        onchanges=[Test.nop("noop state for reload nginx").requisite],
         require=[nginx_service],
     )
