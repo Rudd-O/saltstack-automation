@@ -19,6 +19,10 @@ def privkey_path(hostname):
     return os.path.join(certificate_dir(hostname), "privkey.pem")
 
 
+def restart_service_for_cert(service, hostname):
+    Service.running(extend(service), watch=[Cmd(f"generate certificate for {hostname}")])
+
+
 def renewal_hook(service, mode="reload"):
     global File
     global Service
