@@ -76,8 +76,7 @@ class DefaultStateFactoryDict(dict):
         return dict.__getitem__(self, key)
 
 
-def render(template, saltenv="base", sls="", salt_data=True, **kwargs):
-    # these hold the scope that our sls file will be executed with
+def prep_globals(sls):
     _globals = DefaultStateFactoryDict()
 
     # add all builtins
@@ -141,6 +140,13 @@ def render(template, saltenv="base", sls="", salt_data=True, **kwargs):
     except NameError:
         pass
 
+    return _globals
+
+
+def render(template, saltenv="base", sls="", salt_data=True, **kwargs):
+    # these hold the scope that our sls file will be executed with
+    _globals = prep_globals(sls)
+
     # if salt_data is not True then we just return the global scope we've
     # built instead of returning salt data from the registry
     if not salt_data:
@@ -160,7 +166,7 @@ def render(template, saltenv="base", sls="", salt_data=True, **kwargs):
     def process_template(template):
         template_data = []
         # Do not pass our globals to the modules we are including and keep the root _globals untouched
-        template_globals = dict(_globals)
+        template_globals = prep_globals(sls)
         for line in template.readlines():
             line = line.rstrip("\r\n")
             matched = False
@@ -215,6 +221,8 @@ def render(template, saltenv="base", sls="", salt_data=True, **kwargs):
 
             if not matched:
                 template_data.append(line)
+            else:
+                template_data.append("# processed: " + line)
 
         return "\n".join(template_data), template_globals
 
