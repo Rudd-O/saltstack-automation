@@ -30,8 +30,11 @@ def cmd_with_serialization(cmd, **kwargs):
         return subprocess.check_output(cmd, **kwargs)
 
 
-def tree():
+def tree(vm=None):
     a = ["qvm-pass"]
+    if vm is not None:
+        a.append("-d")
+        a.append(vm)
     e = dict(os.environ.items())
     e["LC_ALL"] = "en_US.utf-8"
     lines = cmd_with_serialization(a, env=e, bufsize=0)
@@ -67,8 +70,8 @@ def tree():
     return items
 
 
-def listdir(subdir=None):
-    t = tree()
+def listdir(subdir=None, vm=None):
+    t = tree(vm=vm)
     if subdir is None:
         return list(t.keys())
     if hasattr(subdir, "decode") or hasattr(subdir, "encode"):
@@ -78,8 +81,11 @@ def listdir(subdir=None):
     return list(t.keys())
 
 
-def get(key, create=True):
+def get(key, create=True, vm=None):
     a = ["qvm-pass"]
+    if vm is not None:
+        a.append("-d")
+        a.append(vm)
     if not (hasattr(key, "decode") or hasattr(key, "encode")):
         key = os.path.sep.join(key)
     if create:
@@ -89,8 +95,11 @@ def get(key, create=True):
     return cmd_with_serialization(a, universal_newlines=True, bufsize=0)[:-1]
 
 
-def get_multiline(key):
+def get_multiline(key, vm=None):
     a = ["qvm-pass"]
+    if vm is not None:
+        a.append("-d")
+        a.append(vm)
     if not (hasattr(key, "decode") or hasattr(key, "encode")):
         key = os.path.sep.join(key)
     a.append("--")
@@ -98,8 +107,8 @@ def get_multiline(key):
     return cmd_with_serialization(["qvm-pass", key], universal_newlines=True, bufsize=0)
 
 
-def get_json(key):
-    return json.loads(get_multiline(key))
+def get_json(key, vm=None):
+    return json.loads(get_multiline(key, vm=vm))
 
 
 if __name__ == "__main__":
