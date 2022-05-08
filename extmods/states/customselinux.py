@@ -1,5 +1,6 @@
 import os
 from shlex import quote
+import subprocess
 
 
 def _single(subname, *args, **kwargs):
@@ -53,15 +54,32 @@ cd /etc/selinux/targeted/local
         )
     if success():
         if not __opts__["test"]:
-            a(
-                _single(
-                    f"Install policy module {fname}",
-                    "selinux.module",
-                    name=fname,
-                    install=True,
-                    source=f"/etc/selinux/targeted/local/{fname}.pp",
+            try:
+                selinuxenabled = subprocess.call("selinuxenabled")
+                if selinuxenabled == 1:
+                    selinuxenabled = False
+                else:
+                    selinuxenabled = True
+            except OSError:
+                selinuxenabled = False
+            if selinuxenabled:
+                a(
+                    _single(
+                        f"Install policy module {fname}",
+                        "selinux.module",
+                        name=fname,
+                        install=True,
+                        source=f"/etc/selinux/targeted/local/{fname}.pp",
+                    )
                 )
-            )
+            else:
+                a(
+                    _single(
+                        f"Skipping install of policy module {fname} because SELinux is not enabled",
+                        "test.nop",
+                        name=fname,
+                    )
+                )
     else:
         _single(
             f"Remove bad modules",
