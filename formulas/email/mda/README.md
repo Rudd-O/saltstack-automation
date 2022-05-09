@@ -1,7 +1,7 @@
 # MDA formula
 
-This formula sets up a local mail delivery agent, mail recipients, aliases
-and catchall delivery of e-mail.
+This formula sets up a local mail delivery agent, mail recipients, forwardings,
+and catchall delivery of e-mail on a per-domain basis.
 
 The local mail delivery agent is only configured when the formula has been
 instructed to create mail recipients.  In this case, this formula requires
@@ -24,14 +24,6 @@ there are recipients registered.
 Set to `True` to forcibly enable the MDA even without recipients registered,
 or `False` to prevent enabling the MDA even with registered recipients.
 
-### `catchall_username`
-
-Sets the default user name or e-mail addresses that gets the mail sent to all
-common aliases defined in `/etc/aliases`.  If not explicitly set to `null`,
-this will default to the first user name in the recipients list.
-
-By default this formula will not enable catchall.
-
 ### `recipients`
 
 A list of final recipients for mail, to be created locally.  A non-empty list
@@ -46,10 +38,23 @@ recipients:
                       # won't change after creation unless
                       # enforce_password is also set in this recipient
   name: User Name     # User's desired full name
-  aliases:            # A list of email addresses this account receives.
-  - info@domain.com   # assumes this server also handles domain.com mail
+  addresses:          # A list of email addresses this account receives.
+                      # If the list is empty, this account will not receive
+                      # any e-mail (unless set as catchall).
+  - info@domain.com
   - sales@domain2.com
+  # The following is a domain catchall:
+  # - @domain3.com
 # ...
+
+#### Catch-all address for a domain
+
+In a recipient, you can list an e-mail address without a user name part
+(the at sign, then the domain) and this will act as a catch-all for that
+domain, sending the e-mail to that recipient's mail account.
+
+By default this formula will not enable any catch-all.
+
 ```
 
 ### `forwardings`

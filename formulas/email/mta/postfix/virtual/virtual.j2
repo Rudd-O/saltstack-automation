@@ -323,8 +323,8 @@
 # 
 #                                                                     VIRTUAL(5)
 {%- for account in recipients|default([]) %}
-{%-     for address in account.aliases|default([]) %}
-{{ address }}     {{ account.user }}
+{%-     for address in account.addresses|default([]) %}
+{{ address }}     {{ account.user }}@localhost
 {%-     endfor %}
 {%- endfor %}
 

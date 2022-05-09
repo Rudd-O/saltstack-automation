@@ -33,8 +33,20 @@ defaults = {
 p = pillar("email", {})
 config = __salt__["slsutil.merge"](defaults, p)
 
-assert config["mda"]["mailbox_type"] in ["maildir", "mbox"], "mailbox_type can be only one of maildir or mbox"
-n, o = "smtpd_tls_security_level", ["none", "may", "encrypt", "dane", "dane-only", "fingerprint", "verify", "secure"]
+assert config["mda"]["mailbox_type"] in [
+    "maildir",
+    "mbox",
+], "mailbox_type can be only one of maildir or mbox"
+n, o = "smtpd_tls_security_level", [
+    "none",
+    "may",
+    "encrypt",
+    "dane",
+    "dane-only",
+    "fingerprint",
+    "verify",
+    "secure",
+]
 assert config["mta"][n] in o, f"{n} can be only one of {o}"
 n, o = "smtp_tls_security_level", ["none", "may", "encrypt"]
 assert config["mta"][n] in o, f"{n} can be only one of {o}"
@@ -46,12 +58,24 @@ if "mailbox_command" not in config["mta"]:
     if config["mda"].get("recipients") and config["mda"]["enable"] is not False:
         config["mta"]["mailbox_command"] = "/usr/libexec/dovecot/deliver"
 
-if config["mda"].get("recipients"):
-    if "catchall_username" not in config["mda"]:
-        config["mda"]["catchall_username"] = config["mda"]["recipients"][0]["user"]
-
 if "destination_domains" not in config["mta"]:
-    config["mta"]["destination_domains"] = ["$mydomain"]
+    autodisco_domains = []
+    for recipient in config["mda"].get("recipients", []):
+        for address in recipient.get("addresses", []):
+            splitted = address.split("@")
+            if len(splitted) > 1:
+                domain = splitted[-1].lower()
+                if domain not in autodisco_domains:
+                    autodisco_domains.append(domain)
+    for alias in config["mda"].get("forwardings", []):
+        splitted = alias["name"].split("@")
+        if len(splitted) > 1:
+            domain = splitted[-1].lower()
+            if domain not in autodisco_domains:
+                autodisco_domains.append(domain)
+    if not autodisco_domains:
+        autodisco_domains = ["$mydomain"]
+    config["mta"]["destination_domains"] = autodisco_domains
 
 for m in "HELO_reject Mail_From_reject PermError_reject TempError_Defer".split():
     if isinstance(config["mta"]["spf"][m], bool):

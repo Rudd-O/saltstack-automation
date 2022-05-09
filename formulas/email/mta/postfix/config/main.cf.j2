@@ -186,7 +186,7 @@ inet_protocols = ipv4
 #
 # See also below, section "REJECTING MAIL FOR UNKNOWN LOCAL USERS".
 #
-mydestination = localhost{% for d in destination_domains %}, {{ d }}{% endfor %}
+mydestination = localhost, localhost.$myhostname
 #mydestination = $myhostname, localhost.$mydomain, localhost, $mydomain,
 #       mail.$mydomain, www.$mydomain, ftp.$mydomain
 
@@ -407,8 +407,11 @@ mynetworks = {{ mynetworks | join(", ") }}
 # It will take a minute or so before changes become visible.  Use
 # "postfix reload" to eliminate the delay.
 #
+# Note:
+# Alias maps has been disabled and we are using virtual alias maps.
+#
 #alias_maps = dbm:/etc/aliases
-alias_maps = hash:/etc/aliases
+#alias_maps = hash:/etc/aliases
 #alias_maps = hash:/etc/aliases, nis:mail.aliases
 #alias_maps = netinfo:/aliases
 
@@ -730,6 +733,7 @@ smtp_tls_cert_file = $smtpd_tls_cert_file
 smtp_tls_key_file = $smtpd_tls_key_file
 message_size_limit = {{ message_size_limit }}
 mailbox_size_limit = {{ mailbox_size_limit }}
+virtual_alias_domains = {{ destination_domains | join(", ") }}
 virtual_alias_maps = hash:/etc/postfix/virtual
 
 smtpd_milters = unix:/var/spool/opendkim/socket/opendkim.sock

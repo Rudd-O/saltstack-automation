@@ -53,7 +53,7 @@ Defaults to host name of the machine minus the initial component before
 the first dot.
 
 Your server can receive mail for more than one `domain` — see the setting
-`destination_domains` for it.
+`destination_domains`.
 
 ### `origin`
 
@@ -71,9 +71,8 @@ it to the value of the domain instead.
 Specifies which domains the server will accept mail for.
 Mail sent to the MTA machine for domains not listed here will be rejected.
 
-The default value is to accept mail only for the `domain` parameter.  If you
-specify a value for this parameter, ensure to include the `domain`, as it will
-otherwise not be included on the list of `destination domains`.
+The default value is generated based on the recipients and forwardings lists.
+Each domain used in one of the addresses or alias sources will be listed here.
 
 ### `mynetworks`
 

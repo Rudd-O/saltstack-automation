@@ -1,6 +1,5 @@
 include:
 - .service
-- .aliases
 - .virtual
 - .config
 - .tls
