@@ -1,7 +1,6 @@
 #!pyobjects
 
 from salt://lib/defs.sls import Perms
-from salt://lib/roster.sls import Dom0
 
 try:
     from shlex import quote
@@ -77,62 +76,6 @@ def RpcPolicy(name, contents):
         group="qubes",
         **Perms.dir
     ).requisite
-
-
-def ShutoffVm(vm_name, require=None, onchanges=None, role=None):
-    # FIXME follow the pattern of QubesService below,
-    # no longer using Salt.function to make it stateful.
-    require = require or []
-    onchanges = onchanges or []
-    dom0 = Dom0(vm_name)
-    vm_name = vm_name.split(".")[0]
-    assert dom0, (vm_name, dom0)
-    fname = 'Shutoff ' + vm_name + ' in ' + dom0
-    if role:
-        fname = fname + " for role " + role
-    Salt.function(
-        fname,
-        name='cmd.run',
-        tgt=dom0,
-        tgt_type='list',
-        arg=['qvm-shutdown --force --wait ' + quote(vm_name)],
-        ssh=True,
-        parallel=True,
-        require=require,
-        onchanges=onchanges,
-    )
-    return Salt(fname)
-
-
-def QubesService(vm_name, services, require=None, onchanges=None, require_in=None):
-    if type(services) is not list and type(services) is not tuple:
-        services = [services]
-    dom0 = Dom0(vm_name)
-    # FIXME: make the update roster program generate a table of vm_names instead
-    # of hardcoding here a period.
-    vm_name = vm_name.split(".")[0]
-    require = require or []
-    onchanges = onchanges or []
-    require_in = require_in or []
-    snames = ", ".join(services)
-    fname = f"Enable services {snames} on {vm_name} in {dom0}"
-
-    if not pillar('skip_dom0s') and dom0:
-        req = Salt.state(
-            fname,
-            tgt=dom0,
-            tgt_type='list',
-            sls='orch.lib.qubes.qvm-service',
-            pillar={"services": services, "vm_name": vm_name},
-            ssh=True,
-            require=require,
-            onchanges=onchanges,
-            require_in=require_in,
-        ).requisite
-        return Salt(fname)
-    else:
-        req = Test.nop(fname).requisite
-    return req
 
 
 def BindDirs(name, directories, require=None):
