@@ -41,7 +41,9 @@ assert config["mta"][n] in o, f"{n} can be only one of {o}"
 
 if "mailbox_command" not in config["mta"]:
     config["mta"]["mailbox_command"] = "/bin/true"
-    if config["mda"].get("recipients") and config["mda"]["enable"] != False:
+    if config["mda"]["enable"]:
+        config["mta"]["mailbox_command"] = "/usr/libexec/dovecot/deliver"
+    if config["mda"].get("recipients") and config["mda"]["enable"] is not False:
         config["mta"]["mailbox_command"] = "/usr/libexec/dovecot/deliver"
 
 if config["mda"].get("recipients"):
