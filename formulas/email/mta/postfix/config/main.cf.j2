@@ -720,6 +720,7 @@ smtpd_helo_required = yes
 smtpd_sender_restrictions = reject_unknown_sender_domain
 smtpd_relay_restrictions = permit_sasl_authenticated, permit_mynetworks, reject_unauth_destination
 smtpd_recipient_restrictions = permit_sasl_authenticated, permit_mynetworks, reject_unauth_destination, check_policy_service unix:private/policyd-spf{% if greylisting %}, check_policy_service unix:postgrey/socket{% endif %}
+smtpd_relay_before_recipient_restrictions = yes
 
 smtpd_use_tls = yes
 smtpd_tls_loglevel = 1
