@@ -7,14 +7,22 @@ The local mail delivery agent is only configured when the formula has been
 instructed to create mail recipients.  In this case, this formula requires
 a properly-setup MTA formula to work (it assumes that said formula's
 properly-configured Postfix will relay email to the local mail delivery agent).
-If no local recipients have been registered, the mail delivery agent becomes
-`/bin/true` and any incoming mail meant for local accounts is simply
-blackholed as a result.
+If no local recipients have been registered, or the `enable` setting is forced
+to False, the mail delivery agent becomes `/bin/true` and any incoming mail
+meant for local accounts is simply blackholed as a result.
 
 ## Pillar documentation
 
 All pillar values here must be nested under the `email:mda` top level variable.
 Values are optional unless no default is stated.
+
+### `enable`
+
+Defaults to `None`, meaning the mail delivery agent will only be enabled if
+there are recipients registered.
+
+Set to `True` to forcibly enable the MDA even without recipients registered,
+or `False` to prevent enabling the MDA even with registered recipients.
 
 ### `catchall_username`
 

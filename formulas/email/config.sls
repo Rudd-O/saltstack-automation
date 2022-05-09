@@ -26,6 +26,7 @@ defaults = {
         },
     },
     "mda": {
+        "enable": None,  # Means MDA will only be enabled if recipients are listed.
         "mailbox_type": "maildir",
     },
 }
@@ -40,7 +41,7 @@ assert config["mta"][n] in o, f"{n} can be only one of {o}"
 
 if "mailbox_command" not in config["mta"]:
     config["mta"]["mailbox_command"] = "/bin/true"
-    if config["mda"].get("recipients"):
+    if config["mda"].get("recipients") and config["mda"]["enable"] != False:
         config["mta"]["mailbox_command"] = "/usr/libexec/dovecot/deliver"
 
 if config["mda"].get("recipients"):
