@@ -20,8 +20,12 @@ if context:
             f"Mail recipient {u['user']}",
             name=u["user"],
             system=False,
+            require_in=[Test("All local recipients created")],
             **optionals,
         )
+
+        if not u.get("addresses"):
+            continue
 
         File.managed(
             f"/var/mail/{u['user']}",
