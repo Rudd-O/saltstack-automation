@@ -3,6 +3,7 @@
   - contents: |
       [Unit]
       Description=Umbrel service collection
+      After=network-online.target
       
       [Service]
       Type=oneshot
