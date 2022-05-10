@@ -8,7 +8,7 @@ include(sls + ".postfix")
 
 include(sls + ".spf")
 
-include(sls + ".dovecot")
+include(".".join(sls.split(".")[:-1]) + ".dovecot")
 
 Service.running(
     extend("postfix"),
