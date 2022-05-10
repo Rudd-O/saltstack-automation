@@ -147,7 +147,7 @@ public key should be published in a DNS TXT record
 
 To generate these keys, create a directory `test` and change into that
 directory, then run command
-`opendkim-genkey --selector=default --domain=<domain name>` -- you will then
+`opendkim-genkey --bits=2048 --selector=default --domain=<domain name>` -- you will then
 find file `default.txt` with the DNS TXT record to add to your domain name
 server, and `default.private` will have the text you must add in the pillar
 shown above.  The program `opendkim-genkey` is distributed with the package
