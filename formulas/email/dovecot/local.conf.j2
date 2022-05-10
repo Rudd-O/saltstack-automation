@@ -1,0 +1,83 @@
+auth_mechanisms = plain login
+{%- if enable %}
+lda_mailbox_autocreate = yes
+lda_mailbox_autosubscribe = yes
+listen = *
+{%   if mailbox_type == "maildir" -%}
+mail_location = maildir:~/Maildir
+namespace inbox {
+  separator = "/"
+}
+{%   else -%}
+mail_location = mbox:~/mail
+{%   endif -%}
+plugin {
+  sieve = ~/.dovecot.sieve
+  sieve_dir = ~/sieve
+  sieve_before = /var/lib/sieve/before.d
+  sieve_after = /var/lib/sieve/after.d
+  sieve_global = /var/lib/sieve/global
+
+  sieve_plugins = sieve_imapsieve sieve_extprograms
+  imapsieve_mailbox1_name = SPAM
+  imapsieve_mailbox1_causes = COPY
+  imapsieve_mailbox1_before = file:/var/lib/sieve/imapsieve/report-spam.sieve
+
+  imapsieve_mailbox2_name = *
+  imapsieve_mailbox2_from = SPAM
+  imapsieve_mailbox2_causes = COPY
+  imapsieve_mailbox2_before = file:/var/lib/sieve/imapsieve/report-ham.sieve
+
+  sieve_pipe_bin_dir = /usr/local/libexec/sieve
+  sieve_filter_bin_dir = /usr/local/libexec/sieve
+
+  sieve_global_extensions = +vnd.dovecot.pipe +vnd.dovecot.execute +vnd.dovecot.filter
+}
+protocols = imap sieve
+service imap-login {
+  inet_listener imaps {
+    port = 993
+    ssl = yes
+  }
+}
+service managesieve-login {
+  inet_listener sieve {
+    port = 4190
+  }
+}
+protocol lda {
+  mail_plugins = sieve
+}
+protocol imap {
+  mail_plugins = $mail_plugins imap_sieve
+  mail_max_userip_connections = 20
+}
+{%- endif %}{# enable #}
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    group = postfix
+    mode = 0666
+    user = postfix
+  }
+  unix_listener auth-userdb {
+    mode = 0660
+  }
+}
+userdb {
+  driver = passwd
+}
+passdb {
+  driver = pam
+}
+mail_access_groups=mail
+disable_plaintext_auth = yes
+{% if enable %}
+ssl = required
+ssl_cert = <{{ tls_cert_file }}
+ssl_key = <{{ tls_key_file }}
+ssl_dh = </etc/dovecot/dh.pem
+ssl_min_protocol = TLSv1.2
+ssl_cipher_list = EECDH+AESGCM:AES256+EECDH:AES128+EECDH
+ssl_prefer_server_ciphers = yes # >Dovecot 2.2.6
+# ssl_dh_parameters_length = 4096 # >Dovecot 2.2
+{% endif %}

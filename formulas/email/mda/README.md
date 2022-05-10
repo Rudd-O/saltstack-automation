@@ -11,6 +11,9 @@ If no local recipients have been registered, or the `enable` setting is forced
 to False, the mail delivery agent becomes `/bin/true` and any incoming mail
 meant for local accounts is simply blackholed as a result.
 
+Unless the MDA formula is disabled (see below), this provides mailbox services
+via secure IMAP, as well as Sieve, to clients.
+
 ## Pillar documentation
 
 All pillar values here must be nested under the `email:mda` top level variable.
@@ -18,11 +21,23 @@ Values are optional unless no default is stated.
 
 ### `enable`
 
-Defaults to `None`, meaning the mail delivery agent will only be enabled if
-there are recipients registered.
+Defaults to `None`, meaning the mail delivery agent (which provides mailbox services
+will only be enabled if there are recipients registered.
 
 Set to `True` to forcibly enable the MDA even without recipients registered,
 or `False` to prevent enabling the MDA even with registered recipients.
+
+### `hostname`
+
+Defaults to whatever the MTA hostname is.  This will be used to generate the
+certificates that Dovecot will present to clients, if mailbox services are enabled.
+
+### `tls_key_file`, `tls_cert_file`
+
+Sets paths to the TLS certificate files for the server, if you are using your
+own custom SSL certificates for the mailbox services hostname of the machine,
+rather than rely on the built-in letsencrypt support.  This automatically disables
+letsencrypt use.
 
 ### `recipients`
 

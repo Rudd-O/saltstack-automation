@@ -51,12 +51,19 @@ assert config["mta"][n] in o, f"{n} can be only one of {o}"
 n, o = "smtp_tls_security_level", ["none", "may", "encrypt"]
 assert config["mta"][n] in o, f"{n} can be only one of {o}"
 
+if "hostname" not in config["mda"]:
+    config["mda"]["hostname"] = config["mta"]["hostname"]
+
 if "mailbox_command" not in config["mta"]:
     config["mta"]["mailbox_command"] = "/bin/true"
+    enable = False
     if config["mda"]["enable"]:
+        enable = True
         config["mta"]["mailbox_command"] = "/usr/libexec/dovecot/deliver"
     if config["mda"].get("recipients") and config["mda"]["enable"] is not False:
+        enable = True
         config["mta"]["mailbox_command"] = "/usr/libexec/dovecot/deliver"
+    config["mda"]["enable"] = enable
 
 if "destination_domains" not in config["mta"]:
     autodisco_domains = []

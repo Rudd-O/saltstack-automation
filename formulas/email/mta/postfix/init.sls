@@ -5,7 +5,7 @@ include:
 - .tls
 
 extend:
-  certs ready:
+  postfix certs ready:
     test:
     - require_in:
       - file: /etc/postfix/main.cf
