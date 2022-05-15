@@ -409,9 +409,10 @@ mynetworks = {{ mynetworks | join(", ") }}
 #
 # Note:
 # Alias maps has been disabled and we are using virtual alias maps.
+# To prevent some logspam we still configure it.
 #
 #alias_maps = dbm:/etc/aliases
-#alias_maps = hash:/etc/aliases
+alias_maps = hash:/etc/aliases
 #alias_maps = hash:/etc/aliases, nis:mail.aliases
 #alias_maps = netinfo:/aliases
 
