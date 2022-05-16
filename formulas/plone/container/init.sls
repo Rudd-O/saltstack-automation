@@ -124,9 +124,13 @@ def copy_over(source, destination, **kwargs):
     return Cmd.run(
         f"copy over {source} to {destination}",
         name="""set -e
+context=$(ls -Zd %(destination)s | cut -f 1 -d ' ' || true)
 rsync -a --delete --inplace %(source)s/filestorage/ %(destination)s/filestorage/
 rm -rf %(destination)s/blobstorage
 cp -al %(source)s/blobstorage %(destination)s/blobstorage
+if [ "$context" != "" ] ; then
+    chcon -R "$context" %(destination)s/blobstorage %(destination)s/filestorage
+fi
         """
         % {
             "source": quote(source),
