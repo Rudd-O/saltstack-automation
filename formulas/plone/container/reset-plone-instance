@@ -51,7 +51,7 @@ $debug service container-plone-"$instance"-green stop || true
 $debug cd "$data_basedir"
 context=$(ls -Zd "$instance"-green | cut -f 1 -d ' ' || true)
 $debug rm -rf "$instance"-green/blobstorage "$instance"-green/filestorage
-$debug cp -al "$base"-green/blobstorage "$instance"-green/blobstorage
+$debug cp -a --reflink=auto "$base"-green/blobstorage "$instance"-green/blobstorage
 $debug cp -a "$base"-green/filestorage "$instance"-green/filestorage
 if [ "$context" != "" ] ; then
     $debug chcon -R "$context" "$instance"-green/blobstorage "$instance"-green/filestorage

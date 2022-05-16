@@ -127,7 +127,7 @@ def copy_over(source, destination, **kwargs):
 context=$(ls -Zd %(destination)s | cut -f 1 -d ' ' || true)
 rsync -a --delete --inplace %(source)s/filestorage/ %(destination)s/filestorage/
 rm -rf %(destination)s/blobstorage
-cp -al %(source)s/blobstorage %(destination)s/blobstorage
+cp -a --reflink=auto %(source)s/blobstorage %(destination)s/blobstorage
 if [ "$context" != "" ] ; then
     chcon -R "$context" %(destination)s/blobstorage %(destination)s/filestorage
 fi
