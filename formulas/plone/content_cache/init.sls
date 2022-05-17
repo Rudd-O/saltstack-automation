@@ -67,6 +67,9 @@ reload varnish:
   file.recurse:
   - source: salt://{{ sls.replace(".", "/") }}/vcl
   - clean: true
+  - template: jinja
+  - context:
+      purgekey: {{ context.get("purgekey", "") | json }}
   - exclude_pat:
     - 50-backends.vcl
   - require:

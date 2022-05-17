@@ -8,11 +8,11 @@ also as pillar `plone:ssl_termination:server_name`.  It then sets up an NginX in
 redirects all incoming HTTP traffic to HTTPS, and all HTTPS traffic to the address specified
 in pillar `plone:ssl_termination:backend`.
 
-The `director` formula uses Varnish to select an appropriate Plone backend from the existing
-list of backends.
-
 The `container` formula sets up one or more Plone deployments with independent data folders.
 These are configured as dictionaries under the `plone:container:deployments` pillar.
+
+The `content_cache` formula deploys Varnish.  The `director` pillars can configure how the
+appropriate Plone backend is selected from the existing list of backends.
 
 A command `reset-plone-instance` is provided which resets the data of any deployed Plone
 instance based on the data of any other Plone instance (by default `master`).  The name of
@@ -32,7 +32,7 @@ plone:
   ssl_termination:
     server_name: staging.example.org
     backend: 127.0.0.1:6081
-  cache:
+  content_cache:
     listen_addr: 127.0.0.1:6081
   container:
     directories:
@@ -96,3 +96,35 @@ the supported settings are:
 * `site`: defines a Plone site (URL fragment from the root of the
   Plone container) to serve at this hostname.  If unspecified, it
   will simply serve the root of the Plone container.
+
+### `plone:content_cache` pillar
+
+This pillar may contain three different key/pair values:
+
+* `listen_addr` in host:port format to define where Varnish will
+  listen to HTTP request.
+* `opts` to specify which command-line options to pass to Varnish
+* `purgekey` is a string that enables cache purging if specified,
+  but only to clients that possess the string and pass it in the
+  URL.
+
+## Cache purging
+
+If a `purgekey` is set (see above), then clients that call URL
+`https://yourfrontendhostname/purgekey=<the purge key>/abc` with
+method `PURGE` will get `/abc` purged from the cache.
+
+The general formula for the purge URL is:
+
+* the regular base URL of your front end host name
+* `/purgekey=` with the purge key added to the right,
+* `/url` which can be whatever URL you want to purge.
+
+So, if your Plone instance is running at `abc.com`, and you settled
+on a purge key `zzz`, then the URL you would put in your Plone
+caching settings (*Caching proxies*) would be
+`https://abc.com/purgekey=zzz`.  If you run multiple domains, you
+may want to configure multiple of these URLs in that setting field,
+all with different domain names.
+
+Remember: with no purge key (the default), purging is disabled.
