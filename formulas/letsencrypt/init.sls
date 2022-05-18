@@ -7,8 +7,9 @@ from salt://lib/qubes.sls import template, fully_persistent_or_physical
 from salt://lib/letsencrypt.sls import certbot_webroot, certbot_live, certificate_dir, fullchain_path, privkey_path, renewal_hook
 
 
-include("nginx")
+# FIXME: if all requested certificates are fake, simply do not include NginX at all.
 
+include("nginx")
 
 if fully_persistent_or_physical():
     Pkg.installed("ca-certificates", require_in=[Pkg("certbot")]),
