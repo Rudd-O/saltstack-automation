@@ -2,6 +2,11 @@
 
 import yaml
 
+# FIXME:
+# also make the checker check for DKIM records, SPF records, A records and all that good stuff
+# that is a bitch to check otherwise.
+# checker should run without pulling any code from other SLSes except config.
+# then remove analogous text from test.yml in mailserver role in Ansible.
 
 defaults = {
     "mta": {
