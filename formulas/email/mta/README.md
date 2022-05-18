@@ -35,6 +35,9 @@ as explained below.
 All pillar values here must be nested under the `email:mta` top level variable.
 Values are optional unless no default is stated.
 
+You can verify the configuration as it applies to your host with
+`salt host state.sls email.config`.
+
 ### `hostname`
 
 The host name that the mail server will use and identify as.

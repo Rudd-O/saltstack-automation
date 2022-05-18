@@ -17,10 +17,13 @@ if context["enable"]:
         context["tls_key_file"] = privkey_path(context["hostname"])
         context["tls_cert_file"] = fullchain_path(context["hostname"])
 
+    include(".sieve")
+
 
 with Pkg.installed(
     "dovecot-pkg",
     pkgs=["openssl", "dovecot"],
+    require_in=[Pkg("dovecot-pigeonhole")] if context["enable"] else [],
 ):
     File.managed(
         "/etc/dovecot/local.conf",
@@ -29,7 +32,7 @@ with Pkg.installed(
         watch_in=[Service("dovecot")],
         template="jinja",
         context=context,
-        require=[Test("dovecot certs ready")],
+        require=[Test("dovecot certs ready")] + ([Test("sieve tooling deployed")] if context["enable"] else []),
     )
     Cmd.run(
         "create Diffie-Hellman SSL parameters file",

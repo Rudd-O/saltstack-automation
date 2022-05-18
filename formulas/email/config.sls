@@ -28,6 +28,10 @@ defaults = {
     "mda": {
         "enable": None,  # Means MDA will only be enabled if recipients are listed.
         "mailbox_type": "maildir",
+        "spam": {
+            "file_spam_after_user_scripts": False,
+            "train_spam_filter_with_incoming_mail": False,
+        },
     },
 }
 p = pillar("email", {})
@@ -88,4 +92,7 @@ for m in "HELO_reject Mail_From_reject PermError_reject TempError_Defer".split()
     if isinstance(config["mta"]["spf"][m], bool):
         config["mta"]["spf"][m] = str(config["mta"]["spf"][m])
 
-Test.nop("Effective mail configuration for this host:\n\n" + yaml.safe_dump(config))
+Test.nop(
+    "Effective mail configuration for this host:\n\n"
+    + yaml.safe_dump(config, default_flow_style=False)
+)

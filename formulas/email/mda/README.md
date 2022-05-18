@@ -19,6 +19,9 @@ via secure IMAP, as well as Sieve, to clients.
 All pillar values here must be nested under the `email:mda` top level variable.
 Values are optional unless no default is stated.
 
+You can verify the configuration as it applies to your host with
+`salt host state.sls email.config`.
+
 ### `enable`
 
 Defaults to `None`, meaning the mail delivery agent (which provides mailbox services
@@ -99,3 +102,21 @@ received mail.  You can migrate each username's mailboxes by hand from
 stopping Postfix, reconfiguring to change to `maildir` and restarting
 Dovecot with the `maildir` mailbox type, and then the mailboxes will
 be migrated from `~/mail` mbox to maildir in `~/Maildir`.
+
+### `spam:train_spam_filter_with_incoming_mail`
+
+If true (not the default) the spam filter will first evaluate incoming mail,
+then use the result of the evaluation to reinforce its neural network.
+This can result in faster learning of what is spam / what isn't spam, but
+it can also result in very fast reinforcement of false positives.
+
+By default the spam filter is only trained by your classification actions
+in your client (send mail to SPAM folder, or pull mail out from SPAM folder).
+
+### `spam:file_spam_after_user_scripts`
+
+If true (not the default) the spam filer will only file e-mail as spam after
+all the user classifier sieve scripts have executed.
+
+The default is to file e-mail as spam as soon as it is detected as spam,
+skipping user sieve scripts.
