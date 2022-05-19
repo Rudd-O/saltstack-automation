@@ -4,7 +4,7 @@ from shlex import quote
 from os.path import dirname
 
 from salt://lib/qubes.sls import template, fully_persistent_or_physical
-from salt://lib/letsencrypt.sls import certbot_webroot, certbot_live, certificate_dir, fullchain_path, privkey_path, renewal_hook
+from salt://lib/letsencrypt.sls import certbot_webroot, certbot_live, certificate_dir, fullchain_path, privkey_path, renewal_hook, fake_for
 
 
 # FIXME: if all requested certificates are fake, simply do not include NginX at all.
@@ -23,7 +23,6 @@ else:
 if not template():
     context = pillar("letsencrypt", {})
     default_renewal_email = context.get("renewal_email")
-    default_fake = context.get("fake", False)
 
     if "hosts" not in context or not context["hosts"]:
 
@@ -53,12 +52,10 @@ if not template():
             )
 
         for host, data in hosts.items():
-            fake = data.get("fake", default_fake)
-
             cert = fullchain_path(host)
             key = privkey_path(host)
 
-            if fake:
+            if fake_for(host):
                 if not (salt.file.file_exists(cert) and salt.file.file_exists(key)):
                     C = Cmd.run
                     cmd = 'openssl req -x509 -out /tmp/%(host)s.crt -keyout /tmp/%(host)s.key -newkey rsa:2048 -nodes -sha256 -subj "/CN=%(host)s" -extensions EXT -config <( printf "[dn]\nCN=%(host)s\n[req]\ndistinguished_name = dn\n[EXT]\nsubjectAltName=DNS:%(host)s\nkeyUsage=digitalSignature\nextendedKeyUsage=serverAuth") && mkdir -p $(dirname %(cert)s) && mv /tmp/%(host)s.key %(key)s && mv /tmp/%(host)s.crt %(cert)s'

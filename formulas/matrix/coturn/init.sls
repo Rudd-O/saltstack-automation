@@ -4,7 +4,7 @@ import os
 
 
 from salt://lib/qubes.sls import template, fully_persistent_or_physical
-from salt://lib/letsencrypt.sls import privkey_path, fullchain_path, certificate_dir
+from salt://lib/letsencrypt.sls import privkey_path, fullchain_path, allow_user
 
 
 include("letsencrypt")
@@ -71,7 +71,6 @@ else:
 if not template():
     context = pillar("matrix:coturn", {})
     realm = context["realm"]
-    cert_dir = certificate_dir(realm)
     cert = fullchain_path(realm)
     key = privkey_path(realm)
     context["cert"] = cert
@@ -109,32 +108,15 @@ if not template():
         require=[File('/etc/coturn')],
         watch_in=[Service("coturn")],
     )
-    Cmd.run(
-        "Set coturn ACL for certificates",
-        name="setfacl -R -m u:coturn:rX %s %s %s && setfacl -m u:coturn:rX %s %s" % (
-            salt.text.quote(cert),
-            salt.text.quote(key),
-            salt.text.quote(cert_dir),
-            salt.text.quote("/etc/letsencrypt/live"),
-            salt.text.quote("/etc/letsencrypt/archive"),
-        ),
-        unless=" && ".join([
-            "getfacl %s | grep -q user:coturn:" % salt.text.quote(cert),
-            "getfacl %s | grep -q user:coturn:" % salt.text.quote(key),
-            "getfacl %s | grep -q user:coturn:" % salt.text.quote(cert_dir),
-            "getfacl /etc/letsencrypt/live | grep -q user:coturn:",
-            "getfacl /etc/letsencrypt/archive | grep -q user:coturn:",
-        ]),
-        require=[Test("all certificates generated")],
-    )
+    pre, post = allow_user(realm, "coturn", require=deps)
     Service.running(
         "coturn",
         enable=True,
         watch=[
-            Cmd("Set coturn ACL for certificates"),
+            pre,
             File("/etc/coturn/turnserver.conf"),
         ] + restartwatch,
-        require=restartrequire,
+        require=restartrequire + [post],
     )
     # Create renewal hook to restart coturn.
     File.managed(
