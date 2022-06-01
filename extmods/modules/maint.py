@@ -59,12 +59,14 @@ def restart_services(test=False):
         "report": svcs["report"],
     }
     for svc in svcs["restartable"]:
-        restart = ([] if not test else ["echo"]) + [
-            "systemctl",
-            "--system",
-            "restart",
-            svc,
-        ]
+        # Log which services will be restarted.
+        dofake = "fake " if test else ""
+        subprocess.run(
+            ["logger", "-t", "needs-restart", f"Will now {dofake}restart service {svc}"]
+        )
+        restart = ([] if not test else ["echo"]) + (
+            ["systemctl", "--system", "restart", svc]
+        )
         p = subprocess.run(restart, universal_newlines=True, capture_output=True)
         if p.returncode == 0:
             res["restarted"].append(svc)
