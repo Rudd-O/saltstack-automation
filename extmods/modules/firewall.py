@@ -153,7 +153,9 @@ def _rule_to_iptables(
                 v = [v]
             for x in v:
                 protos.append(["-p", x])
-        elif k == "to_ports":
+        elif k in ("to_ports", "from_ports"):
+            pflags = "--dports" if k == "to_ports" else "--sports"
+            pflag = "--dport" if k == "to_ports" else "--sport"
             if not rule.get("proto") and not protos:
                 protos = [["-p", "tcp"], ["-p", "udp"]]
             if isinstance(v, str) and ("," in v or ":" in v):
@@ -161,14 +163,14 @@ def _rule_to_iptables(
                     [
                         "-m",
                         "multiport",
-                        "--dports",
+                        pflags,
                         ",".join([x.strip() for x in v.split(",") if x.strip()]),
                     ]
                 )
             elif (isinstance(v, str) and re.match("[0-9]+", v)) or isinstance(v, int):
-                parts.extend(["--dport", v])
+                parts.extend([pflag, v])
             else:
-                assert 0, "invalid to_ports %s" % v
+                assert 0, "invalid %s %s" % (k, v)
         elif k == "pkttype":
             parts.extend(["-m", "pkttype", "--pkt-type", v])
             del child_must_process[k]
