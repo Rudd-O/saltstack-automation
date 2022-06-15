@@ -111,6 +111,24 @@ def get_json(key, vm=None):
     return json.loads(get_multiline(key, vm=vm))
 
 
+def get_fields(key, vm=None):
+    m = get_multiline(key, vm=vm)
+    a = m.splitlines(False)
+    f = a[0]
+    m = a[1:]
+    fields = {}
+    for w in m:
+        try:
+            k, v = w.split(":", 1)
+        except Exception:
+            continue
+        v = v.lstrip()
+        fields[k] = v
+    if "password" not in fields:
+        fields["password"] = f
+    return fields
+
+
 if __name__ == "__main__":
     import pprint
     import yaml
