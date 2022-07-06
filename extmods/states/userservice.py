@@ -4,20 +4,29 @@ import subprocess
 
 
 def systemd_reload(name, user):
-    return list(__salt__["state.single"]("cmd.run", "su - %s -c 'systemctl --user daemon-reload'" % shlex.quote(user)).values())[0]
+    return list(__salt__["state.single"]("cmd.run", "systemctl --machine=%s@.host --user daemon-reload" % (shlex.quote(user),)).values())[0]
+
+
+def _runas(cmd, user, use_subprocess=False):
+    cmd = " ".join(shlex.quote(c) for c in cmd)
+    if not use_subprocess:
+        if user is not None:
+            return __salt__["cmd.run"]("su - %s -c %s" % (shlex.quote(user), shlex.quote(cmd)))
+        else:
+            return __salt__["cmd.run"](cmd)
+    with open(os.devnull) as devnull:
+        if user is not None:
+            return subprocess.run("su - %s -c %s" % (shlex.quote(user), shlex.quote(cmd)), shell=True, stdin=devnull, capture_output=True)
+        else:
+            return subprocess.run(cmd, shell=True, stdin=devnull, capture_output=True)
+
+
 
 def running(name, user, enable=False):
-    def runas(cmd, user, use_subprocess=False):
-        cmd = " ".join(shlex.quote(c) for c in cmd)
-        if not use_subprocess:
-            return __salt__["cmd.run"]("su - %s -c %s" % (shlex.quote(user), shlex.quote(cmd)))
-        with open(os.devnull) as devnull:
-            return subprocess.run("su - %s -c %s" % (shlex.quote(user), shlex.quote(cmd)), shell=True, stdin=devnull, capture_output=True)
-
     enableret = dict(result=False, changes={}, name=name, comment="Fallthrough error 1")
     startret = dict(result=False, changes={}, name=name, comment="Fallthrough error 2")
     if enable:
-        r = runas(['systemctl', '--user', 'is-enabled', '--', name], user)
+        r = _runas(['systemctl', '--machine=%s@.host' % user, '--user', 'is-enabled', '--', name], None)
         if r == "static":
             enableret['comment'] = "Unit %s cannot be enabled -- it is static." % name
         elif r == "disabled":
@@ -26,7 +35,7 @@ def running(name, user, enable=False):
                 enableret["changes"]["enabled"] = name
                 enableret["result"] = None
             else:
-                r = runas(['systemctl', '--user', 'enable', '--', name], user, use_subprocess=True)
+                r = _runas(['systemctl', '--machine=%s@.host' % user, '--user', 'enable', '--', name], None, use_subprocess=True)
                 if r.returncode == 0:
                     enableret["comment"] = "Enabled unit %s." % name
                     enableret["changes"]["enabled"] = name
@@ -41,14 +50,14 @@ def running(name, user, enable=False):
         enableret["result"] = True
         enableret["comment"] = ""
 
-    r = runas(['systemctl', '--user', 'is-active', '--', name], user)
+    r = _runas(['systemctl', '--machine=%s@.host' % user, '--user', 'is-active', '--', name], None)
     if r != "active":
         if __opts__["test"]:
             startret["comment"] = "Would have started unit %s." % name
             startret["changes"]["running"] = name
             startret["result"] = None
         else:
-            r = runas(['systemctl', '--user', 'start', '--', name], user, use_subprocess=True)
+            r = _runas(['systemctl', '--machine=%s@.host' % user, '--user', 'start', '--', name], None, use_subprocess=True)
             if r.returncode == 0:
                 startret["comment"] = "Started unit %s." % name
                 startret["changes"]["running"] = name
