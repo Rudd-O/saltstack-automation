@@ -32,6 +32,10 @@ def physical():
     return grains('qubes:persistence') in ('')
 
 
+def updateable():
+    return grains('qubes:updateable', False)
+
+
 def rw_only():
     return grains('qubes:persistence') in ('rw-only',)
 

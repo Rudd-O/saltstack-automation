@@ -1,7 +1,14 @@
-def services_restarted(name):
+def services_restarted(name, exclude_services_globs=None, exclude_paths=None):
+    exclude_services_globs = exclude_services_globs or []
+    exclude_paths = exclude_paths or []
+
     test = __opts__["test"]
     ret = dict(name=name, result=False, changes={}, comment="")
-    r = __salt__["maint.restart_services"](test=test)
+    r = __salt__["maint.restart_services"](
+        test=test,
+        exclude_services_globs=exclude_services_globs,
+        exclude_paths=exclude_paths,
+    )
     k = __salt__["maint.get_kernel_reboot_required"]()
     comment = ["needs-restart report:\n" + r["report"]]
     if r["failed"]:

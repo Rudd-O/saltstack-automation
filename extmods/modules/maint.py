@@ -3,29 +3,11 @@ import os
 import re
 import subprocess
 
-exclude_services = [
-    "dbus.service",
-    "auditd.service",
-    "systemd-logind.service",
-    "xenstored.service",  # Breaks Xen.
-    "xenconsoled.service",  # Breaks Xen consoles.
-    "qubes-db-dom0.service",  # Breaks Qubes OS.
-    "sddm.service",  # Logs out current session.
-    "kdm.service",  # Logs out current session.
-    "^getty@",
-    "^user@",
-    ".+scope$",
-]
 
-exclude_paths = [
-    "/run",
-    "/home",
-    "/tmp",
-]
-
-
-def get_services_that_need_restart():
-    needsrestart = ["needs-restart", "-b"]
+def get_services_that_need_restart(exclude_services_globs=None, exclude_paths=None):
+    exclude_services_globs = exclude_services_globs or []
+    exclude_paths = exclude_paths or []
+    needsrestart = ["needs-restart", "-b", "-u"]
     for p in exclude_paths:
         needsrestart.extend(["-i", p])
     needsrestartoutput = subprocess.check_output(needsrestart, universal_newlines=True)
@@ -33,8 +15,8 @@ def get_services_that_need_restart():
         ["needs-restart"], universal_newlines=True
     )
     svcs = [s for s in needsrestartoutput.splitlines() if s]
-    restartable = [s for s in svcs if not re.match("|".join(exclude_services), s)]
-    nonrestartable = [s for s in svcs if re.match("|".join(exclude_services), s)]
+    restartable = [s for s in svcs if not re.match("|".join(exclude_services_globs), s)]
+    nonrestartable = [s for s in svcs if re.match("|".join(exclude_services_globs), s)]
     return {
         "restartable": restartable,
         "nonrestartable": nonrestartable,
@@ -51,8 +33,10 @@ def is_service_failed(svc):
     return "failed" in p.stdout or "failed" in p.stderr
 
 
-def restart_services(test=False):
-    svcs = get_services_that_need_restart()
+def restart_services(test=False, exclude_services_globs=None, exclude_paths=None):
+    exclude_services_globs = exclude_services_globs or []
+    exclude_paths = exclude_paths or []
+    svcs = get_services_that_need_restart(exclude_services_globs, exclude_paths)
     res = {
         "restarted": [],
         "failed": collections.OrderedDict(),
@@ -86,10 +70,6 @@ def restart_services(test=False):
             stderr=f,
         )
     return res
-
-
-def get_nonrestartable_services_and_paths():
-    return exclude_services, exclude_paths
 
 
 def get_kernel_reboot_required():
