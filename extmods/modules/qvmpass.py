@@ -50,7 +50,10 @@ def tree(vm=None):
             continue
         name = line[depth + 4 :]
         if name.startswith("\x1b[01;34m"):
-            name = name[len("\x1b[01;34m") :]
+            name = name[len("\x1b[01;34m"):]
+            name = name[: -len("\x1b[0m")]
+        elif name.startswith("\x1b[00m"):
+            name = name[len("\x1b[00m"):]
             name = name[: -len("\x1b[0m")]
         if depth > currdepth:
             itemstack.append(items)
