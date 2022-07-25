@@ -176,7 +176,7 @@ def _rule_to_iptables(
                         "-m",
                         "multiport",
                         pflags,
-                        ",".join(v),
+                        ",".join(str(x) for x in v),
                     ]
                 )
             elif (isinstance(v, str) and re.match("[0-9]+", v)) or isinstance(v, int):
