@@ -167,6 +167,18 @@ def _rule_to_iptables(
                         ",".join([x.strip() for x in v.split(",") if x.strip()]),
                     ]
                 )
+            elif isinstance(v, list):
+                for x in v:
+                    if not isinstance(x, int):
+                        assert 0, "Port %r is not an integer" % x
+                parts.extend(
+                    [
+                        "-m",
+                        "multiport",
+                        pflags,
+                        ",".join(v),
+                    ]
+                )
             elif (isinstance(v, str) and re.match("[0-9]+", v)) or isinstance(v, int):
                 parts.extend([pflag, v])
             else:
