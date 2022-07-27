@@ -7,6 +7,7 @@ class Perms(object):
     file = {"mode": "0644"}
     owner_dir = {"mode": "0700"}
     owner_file = {"mode": "0600"}
+    sudoers_file = {"mode": "0400"}
 
     def __init__(self, user, group=None):
         if not group:

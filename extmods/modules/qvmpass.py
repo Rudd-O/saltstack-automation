@@ -85,6 +85,9 @@ def listdir(subdir=None, vm=None):
 
 
 def get(key, create=True, vm=None):
+    # FIXME: uses of get() are tainted by both create=True and the assumption
+    # that this returns the very first line without a space at the end, this
+    # must be corrected everywhere.
     a = ["qvm-pass"]
     if vm is not None:
         a.append("-d")
