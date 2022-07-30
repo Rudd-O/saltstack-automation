@@ -17,7 +17,7 @@ if not template():
     if physical():
         include("plone.ssl_termination.selinux")
 
-    server_names = context.get("server_names", [context.get("server_name", "None")])
+    server_names = context.get("server_names", [context.get("server_name", None)])
     if server_names[0] == None:
 
         Test.fail_without_changes("The plone.ssl_termination formula requires a list of server_names or a server_name under pillar plone:ssl_termination.")
