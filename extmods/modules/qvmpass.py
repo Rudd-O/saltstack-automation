@@ -25,7 +25,7 @@ def cmd_with_serialization_lock(cmd, **kwargs):
 
 def cmd_with_serialization(cmd, **kwargs):
     with posix_ipc.Semaphore(
-        name="/qvmpass.lock", flags=posix_ipc.O_CREAT, initial_value=3
+        name="/qvmpass.lock", flags=posix_ipc.O_CREAT, initial_value=6
     ):
         return subprocess.check_output(cmd, **kwargs)
 
