@@ -1,0 +1,5 @@
+insecureRegistries = [{{ registry_url | json }}]
+
+[[registry]]
+location = {{ registry_url.split("//")[-1] | json }}
+insecure = true

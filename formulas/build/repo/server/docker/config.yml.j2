@@ -1,0 +1,25 @@
+{% if address.startswith("unix:") %}{% set proto = "unix" %}{% set address = address[5:] %}{% else %}{% set proto = "http" %}{% endif -%}
+{% if debug_address is defined and debug_address %}
+{% if debug_address.startswith("unix:") %}{% set debug_proto = "unix" %}{% set debug_address = debug_address[5:] %}{% else %}{% set debug_proto = "http" %}{% endif -%}
+{% endif %}
+version: 0.1
+log:
+  fields:
+    service: registry
+storage:
+    cache:
+        layerinfo: inmemory
+    filesystem:
+        rootdirectory: {{ paths.root | json }}
+http:
+    net: {{ proto | json }}
+    addr: {{ address | json }}
+    secret: {{ secret | json }}
+{% if debug_address is defined and debug_address %}
+debug:
+    net: {{ debug_proto | json }}
+    addr: {{ debug_address | json }}
+    prometheus:
+        enabled: true
+        path: /metrics
+{% endif %}

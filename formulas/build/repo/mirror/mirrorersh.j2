@@ -1,0 +1,54 @@
+#!/usr/bin/python3
+
+# Derived from artifactsh.
+
+import os, sys, shlex, subprocess
+
+name = "%s-%s" % (os.path.basename(__file__), os.getuid())
+prefix = ['flock', '/dev/shm/%s' % name]
+cmd = shlex.split(sys.argv[2])
+mustbes = (
+    ["rsync", "--server", "-lHogDtpre.iLsfxC", "--delete"],
+    ["rsync", "--server", "-lHogDtpre.iLsfxCIv", "--delete"],
+    ["rsync", "--server", "-lHogDtpre.iLsfxCIvu", "--delete"],
+    ["rsync", "--server", "-vlHogDtpre.iLsfxCIvu", "--delete"],
+)
+
+
+def unauth(cmd):
+    print("unauthorized use of %r" % (cmd, ), file=sys.stderr)
+    subprocess.check_call([
+        "logger", "-p", "auth.warning",
+        "-t", "mirrorersh",
+        "Unauthorized attempt to run " + " ".join(shlex.quote(x) for x in cmd)
+        + " by " + str(os.getenv("SSH_CLIENT"))
+    ])
+    EXIT_INVALIDARGUMENT = 2
+    sys.exit(EXIT_INVALIDARGUMENT)
+
+
+def run(cmd):
+    subprocess.check_call([
+        "logger", "-p", "auth.notice",
+        "-t", "mirrorersh",
+        "Executing " + " ".join(shlex.quote(x) for x in cmd)
+        + " on behalf of " + str(os.getenv("SSH_CLIENT"))
+    ])
+    return subprocess.call(prefix + cmd)
+
+
+os.umask(0o0022) # world readable
+repo = os.path.abspath("{{ root }}")
+
+
+for mustbe in mustbes:
+    if mustbe == cmd[:len(mustbe)]:
+        arg = cmd[-1]
+        dest = os.path.abspath(os.path.join(repo, arg))
+        if not (dest.startswith(repo + "/") or dest == repo):
+            unauth(cmd)
+        if not os.path.isdir(dest):
+            os.makedirs(dest, exist_ok=True)
+        ret = run(cmd[:-1] + [dest + "/"])
+        sys.exit(ret)
+unauth(cmd)

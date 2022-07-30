@@ -1,0 +1,7 @@
+[{{ repo_name }}]
+name={{ repo_name }} for $releasever - $basearch
+baseurl={{ base_url }}/{% if grains['os'] == "Qubes" %}q{% else %}fc{% endif %}$releasever/
+enabled={% if enabled|default(True) %}1{% else %}0{% endif %}
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-{{ repo_name }}
+metadata_expire=30
