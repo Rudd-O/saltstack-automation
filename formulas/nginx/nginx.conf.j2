@@ -32,6 +32,11 @@ http {
     proxy_set_header Connection $connection_upgrade;
     # End WebSockets.
 
+    ssl_ciphers PROFILE=SYSTEM;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:1m;
+    ssl_session_timeout 10m;
+
     sendfile            on;
     tcp_nopush          on;
     tcp_nodelay         on;
