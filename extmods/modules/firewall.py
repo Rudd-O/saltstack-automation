@@ -22,7 +22,10 @@ def unique(l):
 def resolve_nodegroup(host_or_network, nodegroups):
     path = host_or_network.split(":")
     while path:
-        nodegroups = nodegroups[path[0]]
+        try:
+            nodegroups = nodegroups[path[0]]
+        except KeyError:
+            raise KeyError("no such nodegroup %s" % path[0])
         path = path[1:]
     assert isinstance(nodegroups, list), (host_or_network, nodegroups)
     return nodegroups
