@@ -1,0 +1,34 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: Matrix
+
+receivers:
+- name: Matrix
+  webhook_configs:
+  - url: '{{ pillar.prometheus.master.alerts.matrix["notifier url"] }}/{{ pillar.prometheus.master.alerts.matrix["room ID"] }}'
+    send_resolved: true
+
+inhibit_rules:
+# Suppress all alerts from a host that cannot be pinged.
+- source_match:
+    alertname: ProbeFailed
+    job: blackbox
+    module: icmp
+  target_match_re:
+    alertname: '.*'
+  equal:
+  - instance
+# Suppress all alerts from a scrape instance when that instance is down.
+- source_match:
+    alertname: InstanceDown
+  target_match_re:
+    alertname: '.*'
+  equal:
+  - instance
+  - job

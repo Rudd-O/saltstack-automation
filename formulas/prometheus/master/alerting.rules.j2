@@ -1,0 +1,192 @@
+{% raw %}
+groups:
+- name: default
+  rules:
+
+# Connectivity alerts.
+# FIXME suppress ProbeFailed when ProberFailing
+# FIXME suppress ProberScrapeBad when ProberFailing
+  - alert: InstanceDown
+    expr: up{instance!="netgear", source=""} == 0
+    for: 2m
+    annotations:
+      summary: '{{ $labels.job }} exporter in {{ $labels.instance }} down'
+      resolved: '{{ $labels.job }} exporter in {{ $labels.instance }} back up'
+  - alert: ProberFailing
+    expr: sum(up{instance!="netgear", source!=""}==0) by (source) / count(up{instance!="netgear", source!=""}) by (source) < 1
+    for: 2m
+    annotations:
+      summary: '{{ $labels.source }} prober only succeeding {{ $value | humanizePercentage }} of the time'
+      resolved: '{{ $labels.source }} prober fully operational'
+  - alert: ProbeFailed
+    expr: probe_success{instance!="netgear"} == 0
+    for: 2m
+    annotations:
+      summary: '{{ $labels.module }} probe of {{ $labels.instance }} failed'
+      resolved: '{{ $labels.module }} probe of {{ $labels.instance }} now successful'
+  - alert: WebsiteSlow
+    expr: sum(probe_http_duration_seconds) by (instance, phase, source) > 2
+    for: 3m
+    annotations:
+      summary: '{{ $labels.module }} response time in phase {{ $labels.phase }} of {{ $labels.instance }} from {{ $labels.source }} at {{ $value }}s > 2s'
+      resolved: '{{ $labels.module }} response time in phase {{ $labels.phase }} of {{ $labels.instance }} from {{ $labels.source }} now < 2s'
+  - alert: LinkDown
+    expr: ifConnectorPresent < 1
+    for: 10s
+
+# Hardware alerts.
+  - alert: BadMemory
+    expr: node_memory_HardwareCorrupted_bytes > 0
+    for: 10s
+  - alert: MachineHot
+    expr: |
+      (
+        # If the temperature exceeds 5degC above the max...
+        max(node_hwmon_temp_celsius{chip != "platform_nct6775_2560"} and (node_hwmon_temp_above_max_celsius >= 5)) by (instance, chip)
+        # ...then surface the temperature.
+      ) or (
+        (
+          # If the temperature exceeds -5degC above the max...
+          max(node_hwmon_temp_celsius{chip != "platform_nct6775_2560"} and (node_hwmon_temp_above_max_celsius >= -5)) by (instance, chip)
+        ) and (
+          # ...and there are any MachineHot alerts in the last 90 seconds...
+          count(max_over_time(ALERTS{alertname="MachineHot"}[90s])) without(alertstate, alertname, priority)
+        )
+        # ...then surface the temperature.
+      )
+    for: 30s
+    annotations:
+      summary: '{{ $labels.instance }} at {{ $value }}°C'
+  - alert: MachineCriticallyHot
+    expr: max((node_hwmon_temp_celsius{chip != "platform_nct6775_2560"} - ((node_hwmon_temp_crit_celsius > 0) - 10) >= 0) + (node_hwmon_temp_crit_celsius - 10)) by (instance, chip)
+    for: 30s
+    annotations:
+      summary: '{{ $labels.instance }} at {{ $value }}°C'
+  - alert: DiskHot
+    expr: smartmon_temperature_celsius_raw_value >= 58
+    for: 60s
+    annotations:
+      summary: '{{ $labels.device }} in {{ $labels.instance }} at {{ $value }}°C'
+  - alert: SMARTUnhealthy
+    expr: smartmon_device_smart_healthy == 0
+    for: 10s
+  - alert: SMARTUncorrectableSectorsFound
+    expr: smartmon_offline_uncorrectable_raw_value > 0
+    for: 10s
+    annotations:
+      summary: '{{ $value }} bad sectors on {{ $labels.device }} in {{ $labels.instance }}'
+  - alert: SMARTPendingSectorsFound
+    expr: smartmon_current_pending_sector_raw_value > 0
+    for: 10s
+    annotations:
+      summary: '{{ $value }} pending sectors on {{ $labels.device }} in {{ $labels.instance }}'
+  - alert: SMARTReallocatedSectorsCountHigh
+    expr: smartmon_reallocated_sector_ct_raw_value > 5
+    for: 10s
+    annotations:
+      summary: '{{ $value }} reallocated sectors on {{ $labels.device }} in {{ $labels.instance }}'
+  - alert: SMARTUDMACRCErrorCountHigh
+    expr: smartmon_udma_crc_error_count_raw_value > 5
+    for: 10s
+    annotations:
+      summary: '{{ $value }} CRC errors on {{ $labels.device }} in {{ $labels.instance }}'
+  - alert: SMARTAttributeAtOrBelowThreshold
+    expr: '{__name__=~"smartmon_.*_value", __name__!~"smartmon_.*_raw_value", __name__!~".*power_on_hours.*"} <= {__name__=~"smartmon_.*_threshold"}'
+    for: 10s
+  - alert: PoolUnhealthy
+    expr: zfs_pool_healthy == 0
+    for: 10s
+    annotations:
+      summary: '{{ $labels.zpool }} in {{ $labels.instance }} is degraded or faulted'
+  - alert: PoolErrored
+    expr: zfs_pool_errors_total > 0
+    for: 10s
+    annotations:
+      summary: '{{ $labels.zpool }} in {{ $labels.instance }} has had {{ $value }} {{ $labels.class }} errors'
+  - alert: ClockDesynced{% endraw %}
+    expr: |
+        node_timex_sync_status{
+{% for mach in salt.pillar.get("nodegroups:qubes:dom0s") + salt.pillar.get("nodegroups:homenetwork:zips") + salt.pillar.get("nodegroups:homenetwork:nexus") %}
+          instance != "{{ mach }}"{% if not loop.last %},{% endif %}
+{% endfor %}
+        } != 1
+    for: 1m{% raw %}
+
+# Resource alerts:
+  - alert: PoolSpaceLow
+    expr: '1 - (zfs_dataset_avail_bytes{dataset !~ ".*/.*"} / zfs_dataset_size_bytes{dataset !~ ".*/.*"}) > 0.95'
+    for: 2m
+    annotations:
+      summary: '{{ $labels.dataset }} in {{ $labels.instance }} at {{ $value }} capacity'
+  - alert: PoolSpaceCriticallyLow
+    expr: '1 - (zfs_dataset_avail_bytes{dataset !~ ".*/.*"} / zfs_dataset_size_bytes{dataset !~ ".*/.*"}) > 0.99'
+    for: 2m
+    annotations:
+      summary: '{{ $labels.dataset }} in {{ $labels.instance }} at {{ $value }} capacity'
+  - alert: FilesystemSpaceCriticallyLow
+    expr: |
+      node_filesystem_avail_bytes / node_filesystem_size_bytes < 0.05
+    for: 1m
+    annotations:
+      summary: '{{ $labels.mountpoint }} in {{ $labels.instance }} at {{ $value | humanizePercentage }} capacity'
+
+# Application alerts.
+
+  - alert: FileDescriptorsCloseToExhaustion
+    expr: process_open_fds > (process_max_fds * 0.8)
+    for: 20s
+  - {% endraw %}{% set backedup = "^(" + "|".join(salt.pillar.get("nodegroups:backup:client", []) + salt.pillar.get("nodegroups:backup:proxied_client", [])) + ")$" %}{% raw %}
+    alert: LastBackupTooOld
+    expr: |
+      time() - (86400 * 3)
+      >
+      (max(borg_archive_end_timestamp_seconds{instance=~"{{ backedup }}"}) without (dataset, archive) or ((up{job="node", instance=~"{{ backedup }}"} == 1) - 1))
+    for: 7200s
+
+# Configuration alerts.
+  - alert: SSLCertExpiringSoon
+    expr: (probe_ssl_earliest_cert_expiry - time()) < (86400 * 15)
+    for: 1m
+    annotations:
+      summary: 'SSL cert of {{ $labels.instance }} expiring in two weeks'
+  - alert: SSLCertExpired
+    expr: probe_ssl_earliest_cert_expiry < time()
+    for: 1m
+    annotations:
+      summary: 'SSL cert of {{ $labels.instance }} expired'
+  - alert: TextfileScrapeError
+    expr: node_textfile_scrape_error > 0
+    for: 30s
+  - alert: ExporterScrapeBad
+    expr: scrape_samples_scraped{source=""} == 0
+    for: 2m
+  - alert: ProberScrapeBad
+    expr: scrape_samples_scraped{source!=""} == 0
+    for: 2m
+  - alert: BadPrometheusConfig
+    expr: prometheus_config_last_reload_successful == 0
+    for: 10s
+    annotations:
+      summary:
+        Prometheus configuration reload unsuccessful
+  - alert: BadAlertmanagerConfig
+    expr: alertmanager_config_last_reload_successful == 0
+    for: 10s
+    annotations:
+      summary:
+        Alertmanager configuration reload unsuccessful
+
+# Home Assistant alerts.
+  - alert: SensorBatteryLow
+    expr: homeassistant_sensor_battery_percent{entity!=".*(galaxy|pixel).*"} < 20
+    for: 5m
+    annotations:
+      summary:
+        The battery of sensor {{ $labels.friendly_name }} is at {{ $value }} percent.
+  - alert: SensorMalfunctioning
+    expr: (time() - homeassistant_last_updated_time_seconds{entity!~".*(pixel|galaxy|magnet).*", domain="sensor", entity!~".*power", entity!~".*pressure", entity!~".*humidity", entity=~".*ambient.*"}) > 3600
+    for: 1m
+    annotations:
+      summary:
+        Sensor {{ $labels.friendly_name }} has not updated in over {{ $value }} seconds.
+{% endraw %}

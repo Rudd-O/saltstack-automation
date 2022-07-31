@@ -1,0 +1,350 @@
+{% macro drop_metric(old) %}
+    - source_labels: [__name__]
+      regex: {{ old | yaml }}
+      action: drop
+{% endmacro %}
+{% macro rename_metric(old, new) %}
+    - source_labels: [__name__]
+      regex: {{ old | yaml }}
+      target_label: __name__
+      replacement: {{ new | yaml }}
+    - source_labels: [__name__]
+      regex: {{ old | yaml }}
+      action: drop
+{% endmacro %}
+{% macro rename_label(old, new) %}
+    - source_labels: [{{ old | yaml }}]
+      target_label: {{ new | yaml }}
+    - target_label: {{ old | yaml }}
+      replacement: ""
+{% endmacro %}
+{% macro drop_label(old) %}
+    - target_label: {{ old | yaml }}
+      replacement: ""
+{% endmacro %}
+
+# my global config
+global:
+  scrape_interval:     5s
+  evaluation_interval: 5s
+  scrape_timeout:      4s
+
+rule_files:
+- alerting.rules
+- recording.rules
+
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets: [localhost:9093]
+
+{% set master = salt.pillar.get('prometheus:master') %}
+
+scrape_configs:
+
+{%-for scraper_type, data in master.blackbox_scrapers.items() %}
+{%-  for scraper_location, data in data.items() %}
+{%-    set sources = data["sources"] %}
+{%-    for source, source_address in sources.items() %}
+{%-      set scraper = scraper_type + "_" + scraper_location + "_" + source %}
+{%-      set scraper_module = scraper_type %}
+{%-      if scraper_type == "http" %}{% set scraper_module = scraper_module + "_2xx" %}{% endif %}
+{%-      if scraper_type == "tcp" %}{% set scraper_module = scraper_module + "_connect" %}{% endif %}
+  - job_name: 'blackbox_{{ scraper }}'
+{%-    if 'scrape_interval' in data %}
+    scrape_interval: {{ data.scrape_interval }}
+{%-    endif %}
+{%-  if 'scrape_timeout' in data %}
+    scrape_timeout: {{ data.scrape_timeout }}
+{%-    endif %}
+    metrics_path: /probe
+    params:
+      module: [{{ scraper_module }}]
+    static_configs:
+    - targets:
+{%-    for target in data.targets %}
+      - {{ target }}{% if scraper_location == "home" and not target.startswith("https://") and not target.startswith("http://") and not scraper_type == "tcp" %}.dragonfear{% endif %} 
+{%-    endfor %}
+    relabel_configs:
+    # Rename the address into the parameter ?target=
+    - source_labels: [__address__]
+      target_label: __param_target
+    # Rename the parameter value of ?target= into the label instance, removing ".dragonfear" from the end.
+    - source_labels: [__param_target]
+      target_label: instance
+      regex: (.+?)(.dragonfear|$)
+      replacement: ${1}
+    # Assign the address of the prober to the __address__ that Prometheus will contact.
+    - target_label: __address__
+      replacement: {{ source_address | json }}
+    # Use the fourth part of the label job to define the source label.
+    - source_labels: [job]
+      target_label: source
+      regex: (.*)_(.*)_(.*)_(.*)
+      replacement: ${4}
+    # Use the second part of the label job to define the module label.
+    - source_labels: [job]
+      target_label: module
+      regex: (.*)_(.*)_(.*)_(.*)
+      replacement: ${2}
+    # Use the third part of the label job to define the location label.
+    - source_labels: [job]
+      target_label: location
+      regex: (.*)_(.*)_(.*)_(.*)
+      replacement: ${3}
+    # Finally, use the first part of the job ("blackbox") as the label job.
+    - source_labels: [job]
+      target_label: job
+      regex: (.*)_(.*)_(.*)_(.*)
+      replacement: ${1}
+{%-    endfor %}
+{%-  endfor %}
+{%-endfor %}
+
+# Cannot run DNS probes from a Qubes VM.  Firewall rules.
+# Would need to move the blackbox exporter to a physical box.
+#  - job_name: 'blackbox_dns_rudd-o.com'
+#    metrics_path: /probe
+#    scrape_interval: 1m
+#    scrape_timeout: 10s
+#    params:
+#      module: [dns_rudd-o.com]
+#    static_configs:
+#    - targets:
+#      - ns1.rudd-o.com
+#      - ns2.rudd-o.com
+#    relabel_configs:
+#    - source_labels: [__address__]
+#      target_label: __param_target
+#    - source_labels: [__param_target]
+#      target_label: instance
+#    - target_label: __address__
+#      replacement: 127.0.0.1:9115
+#    metric_relabel_configs:
+#    - source_labels: [job]
+#      target_label: module
+#      regex: (.*)_(.*)_(.*)
+#      replacement: ${2}
+#    - source_labels: [job]
+#      target_label: location
+#      regex: (.*)_(.*)_(.*)
+#      replacement: ${3}
+#    - source_labels: [job]
+#      target_label: job
+#      regex: (.*)_(.*)_(.*)
+#      replacement: ${1}
+
+{% for scraper, data in master.direct_scrapers.items() %}
+  - job_name: '{{ scraper }}'
+{%-  for record in ["scrape_interval", "scrape_timeout", "metrics_path", "authorization"] %}
+{%-    if record in data %}
+    {{ record }}: {{ data[record] | json }}
+{%-    endif %}
+{%-  endfor %}
+    static_configs:
+    - targets:
+{%-  for target in data.targets %}
+      - {{ target }}:{{ data.port }} at {{ data.location }}{% if target in master.proxy_addresses %} via {{ master.proxy_addresses[target] }}{% endif %}
+{%-  endfor %}
+    relabel_configs:
+    - source_labels: [job]
+      regex: (proxy|direct)_(.*)
+      target_label: job
+      replacement: ${2}
+    - source_labels: [__address__]
+      regex: (.+):(.+) at (.+)
+      replacement: ${1}
+      target_label: instance
+
+    - source_labels: [__address__]
+      regex: (.+):(.+) at (.+)
+      target_label: location
+      replacement: ${3}
+    - source_labels: [__address__]
+      regex: (.+):(.+) at (.+) via (.+)
+      target_label: location
+      replacement: ${3}
+
+    - source_labels: [__address__]
+      regex: ([a-z0-9]+)([.].*|):(.+) at (.+) via (.+)
+      replacement: ${1}
+      target_label: __param_target
+    - source_labels: [__address__]
+      regex: ([a-z0-9]+)([.].*|):(.+) at (.+) via (.+)
+      replacement: /forward
+      target_label: __metrics_path__
+    - source_labels: [__address__]
+      regex: (.+):(.+) at (.+) via (.+)
+      replacement: ${2}
+      target_label: __param_port
+
+    - source_labels: [__address__]
+      regex: (.+):(.+) at (.+) via (.+)
+      replacement: ${4}
+      target_label: __address__
+    - source_labels: [__address__]
+      regex: (.+):(.+) at (.+)
+      replacement: ${1}:${2}
+      target_label: __address__
+
+{%-   if 'job_name' in data %}
+    - source_labels: [job]
+      replacement: {{ data.job_name }}
+      target_label: job
+{%-   endif %}
+
+{%- if scraper == "plone" %}
+    metric_relabel_configs:
+    - source_labels: [__name__]
+      regex: zope_connection_([0-9])+_(.*)
+      target_label: thread
+      replacement: ${1}
+    - source_labels: [__name__]
+      regex: zope_connection_([0-9])+_(.*)
+      target_label: __name__
+      replacement: zope_connection_${2}
+{%- endif %}
+
+{% endfor %}
+
+{% for module, data in master.snmp_scrapers.items() %}
+{%   if module == "ddwrt" %}{% set highcount = "HC" %}{% else %}{% set highcount = "" %}{% endif %}
+  - job_name: 'snmp__{{ module }}__{{ data.location }}'
+    static_configs:
+    - targets:
+{%   for target in data.targets %}
+      - {{ target }}
+{%   endfor %}
+    metrics_path: /snmp
+    params:
+      module: [{{ module }}]
+    relabel_configs:
+    - source_labels: [__address__]
+      target_label: __param_target
+    - source_labels: [__param_target]
+      target_label: instance
+    - target_label: __address__
+      replacement: 10.250.7.6:9116
+    - source_labels: [job]
+      target_label: module
+      regex: (.*)__(.*)__(.*)
+      replacement: ${2}
+    - source_labels: [job]
+      target_label: location
+      regex: (.*)__(.*)__(.*)
+      replacement: ${3}
+    - source_labels: [job]
+      target_label: job
+      regex: (.*)__(.*)__(.*)
+      replacement: ${1}
+    - source_labels: [job]
+      target_label: source
+      regex: (.*)
+      replacement: {{ data.prober_name }}
+    metric_relabel_configs:
+
+{%   if module == "ddwrt" %}
+{{   drop_metric('ifDescr') }}
+{{   drop_metric('ifName') }}
+{{   rename_label('ifName', 'device') }}
+{%     set iface_relabel_data = {
+         "eth.*":    {"type": "ethernet"},
+         "br-.*":    {"type": "bridge"},
+         "wlan0.*":  {"type": "wireless", "frequency": "5GHz"},
+         "wlan1.*":  {"type": "wireless", "frequency": "2.4GHz"},
+       } %}
+{%   elif module == "if_mib" %}
+{{   drop_metric('ifDescr') }}
+{{   drop_metric('ifName') }}
+{{   rename_label('ifDescr', 'device') }}
+{%     set iface_relabel_data = {
+         "Port [0-9] Gigabit Ethernet": {"type": "ethernet"},
+       } %}
+{%   else %}
+{%     set iface_relabel_data = {} %}
+{%   endif %}
+{%   for iface, data in iface_relabel_data|dictsort %}
+{%     for label,value in data|dictsort %}
+    - source_labels: [device]
+      regex: {{ iface }}
+      target_label: {{ label }}
+      replacement: {{ value }}
+{%     endfor %}
+{%   endfor %}
+{{   rename_metric('ifMtu', 'node_network_mtu_bytes') }}
+{{   rename_metric('ifSpeed', 'node_network_speed_bits') }}
+{%   for d, nd in [
+       ('In', 'receive'),
+       ('Out', 'transmit'),
+     ] %}
+{{     rename_metric('if' + d + 'QLen', 'node_network_' + nd + '_queue_length') }}
+{%     for c, nc in [
+         ('Multicast', 'multicast'),
+         ('Ucast', 'unicast'),
+         ('Broadcast', 'broadcast'),
+       ] %}
+    - source_labels: [__name__]
+      regex: {{ 'if' + highcount + d + c + 'Pkts' }}
+      target_label: method
+      replacement: {{ nc }}
+{{       rename_metric('if' + highcount + d + c + 'Pkts', 'node_network_' + nd + '_packets_total') }}
+{{       drop_metric('if' + d + c + 'Pkts') }}
+{%     endfor %}
+{{     drop_metric('if' + d + 'NUcastPkts') }}
+{{     drop_metric('if' + highcount + d + 'NUcastPkts') }}
+{%     for p, t, nt in [
+         ('if' + highcount, 'Octets', 'bytes'),
+         ('if', 'Errors', 'errs'),
+         ('if', 'Discards', 'drop'),
+       ] %}
+{{       rename_metric(p + d + t, 'node_network_' + nd + '_' + nt + '_total') }}
+{{       drop_metric('if' + d + t) }}
+{%     endfor %}
+{%   endfor %}
+{%   for metric, mode in [
+     ("Idle", "idle"),
+     ("SoftIRQ", "irq"),
+     ("Nice", "nice"),
+     ("System", "system"),
+     ("Steal", "steal"),
+     ("User", "user"),
+     ("Wait", "iowait"),
+   ] %}
+    - source_labels: [__name__]
+      regex: ssCpuRaw{{ metric }}
+      target_label: mode
+      replacement: {{ mode }}
+    - source_labels: [__name__]
+      regex: ssCpuRaw{{ metric }}
+      target_label: cpu
+      replacement: '0'
+{{     rename_metric('ssCpuRaw' + metric, 'node_cpu_ticks_total') }}
+{%   endfor %}
+{{   drop_metric('ssCpu.*') }}
+
+{%   if module == "printer_mib" %}
+
+# Printer stuff
+
+{{     rename_metric('hrPrinterStatus', 'printer_status') }}
+{{     rename_label('hrPrinterStatus', 'status') }}
+{{     rename_metric('prtMarkerSuppliesLevel', 'supplies_level') }}
+{{     rename_metric('prtMarkerSuppliesMaxCapacity', 'supplies_level_maximum') }}
+{{     rename_label('prtMarkerSuppliesIndex', 'color') }}
+{{     drop_label('prtMarkerSuppliesType') }}
+{{     drop_metric('prtMarkerSuppliesType') }}
+{%     for idx, name in [
+         ("1", "magenta"),
+         ("2", "cyan"),
+         ("3", "yellow"),
+         ("4", "black"),
+       ] %}
+    - source_labels: [color]
+      regex: {{ idx | string }}
+      target_label: color
+      replacement: {{ name }}
+{%     endfor %}
+
+{%   endif %}
+
+{% endfor %}
