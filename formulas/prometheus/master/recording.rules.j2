@@ -1,15 +1,1 @@
-groups:
-- name: snmp
-  rules:
-  - record: node_cpu_seconds_total
-    expr: node_cpu_ticks_total / 100
-  - record: node_network_speed_bytes
-    expr: node_network_speed_bits / 8
-  - record: supplies_level_ratio
-    expr: supplies_level / supplies_level_maximum
-  - record: node_uptime_seconds
-    expr: sysUpTime / 100
-- name: temp
-  rules:
-  - record: node_hwmon_temp_above_max_celsius
-    expr: node_hwmon_temp_celsius - (node_hwmon_temp_max_celsius > 0)
+{{ recording_rules | yaml(False) }}

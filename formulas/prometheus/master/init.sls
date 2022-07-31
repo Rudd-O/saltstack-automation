@@ -2,6 +2,7 @@
 
 from salt://lib/qubes.sls import dom0, fully_persistent_or_physical, rw_only_or_physical
 from salt://lib/defs.sls import Perms
+from salt://prometheus/config.sls import config
 
 
 pkgs = ["prometheus2", "alertmanager"]
@@ -66,12 +67,13 @@ if rw_only_or_physical() and not dom0():
         File.managed(
             '/etc/default/prometheus',
             contents="PROMETHEUS_OPTS='" + " ".join([
-                "--web.external-url={{ pillar['prometheus']['master_url'] }}",
+                "--web.external-url={{ url }}",
                 "--config.file=/etc/prometheus/prometheus.yml",
                 "--storage.tsdb.path=/var/lib/prometheus/data",
-                "--storage.tsdb.retention.size=" + pillar('prometheus:master:retention', '90GB'),
+                "--storage.tsdb.retention.size={{ retention }}",
             ]) + "'",
             template='jinja',
+            context=config.master,
             require=[Pkg("prometheus-packages")] if grains('qubes:persistence') == "" else [],
             require_in=[Qubes("prometheus-config")],
         )
@@ -81,14 +83,16 @@ if rw_only_or_physical() and not dom0():
                 '/etc/prometheus/%s' % f,
                 source='salt://prometheus/master/%s.j2' % f,
                 template='jinja',
+                context=config.master,
                 require=[Pkg("prometheus-packages")] if grains('qubes:persistence') == "" else [],
                 require_in=[Qubes("prometheus-config")],
             )
     with Service("alertmanager", "watch_in"):
         File.managed(
             '/etc/default/alertmanager',
-            contents="ALERTMANAGER_OPTS='--web.external-url={{ pillar['prometheus']['alertmanager_url'] }}'",
+            contents="ALERTMANAGER_OPTS='--web.external-url={{ url }}'",
             template='jinja',
+            context=config.alertmanager,
             require=[Pkg("prometheus-packages")] if grains('qubes:persistence') == "" else [],
             require_in=[Qubes("prometheus-config")],
         )
@@ -98,6 +102,7 @@ if rw_only_or_physical() and not dom0():
                 '/etc/prometheus/%s' % f,
                 source='salt://prometheus/master/%s.j2' % f,
                 template='jinja',
+                context=config.alertmanager,
                 require=[Pkg("prometheus-packages")] if grains('qubes:persistence') == "" else [],
                 require_in=[Qubes("prometheus-config")],
             )

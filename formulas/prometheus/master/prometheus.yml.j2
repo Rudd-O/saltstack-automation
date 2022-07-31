@@ -38,11 +38,9 @@ alerting:
   - static_configs:
     - targets: [localhost:9093]
 
-{% set master = salt.pillar.get('prometheus:master') %}
-
 scrape_configs:
 
-{%-for scraper_type, data in master.blackbox_scrapers.items() %}
+{%-for scraper_type, data in scrapers.blackbox.items() %}
 {%-  for scraper_location, data in data.items() %}
 {%-    set sources = data["sources"] %}
 {%-    for source, source_address in sources.items() %}
@@ -134,7 +132,7 @@ scrape_configs:
 #      regex: (.*)_(.*)_(.*)
 #      replacement: ${1}
 
-{% for scraper, data in master.direct_scrapers.items() %}
+{% for scraper, data in scrapers.direct.items() %}
   - job_name: '{{ scraper }}'
 {%-  for record in ["scrape_interval", "scrape_timeout", "metrics_path", "authorization"] %}
 {%-    if record in data %}
@@ -144,7 +142,7 @@ scrape_configs:
     static_configs:
     - targets:
 {%-  for target in data.targets %}
-      - {{ target }}:{{ data.port }} at {{ data.location }}{% if target in master.proxy_addresses %} via {{ master.proxy_addresses[target] }}{% endif %}
+      - {{ target }}:{{ data.port }} at {{ data.location }}{% if target in proxy_addresses %} via {{ proxy_addresses[target] }}{% endif %}
 {%-  endfor %}
     relabel_configs:
     - source_labels: [job]
@@ -207,7 +205,7 @@ scrape_configs:
 
 {% endfor %}
 
-{% for module, data in master.snmp_scrapers.items() %}
+{% for module, data in scrapers.snmp.items() %}
 {%   if module == "ddwrt" %}{% set highcount = "HC" %}{% else %}{% set highcount = "" %}{% endif %}
   - job_name: 'snmp__{{ module }}__{{ data.location }}'
     static_configs:
