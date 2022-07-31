@@ -1,7 +1,7 @@
 #!pyobjects
 
 from salt://lib/qubes.sls import dom0, fully_persistent_or_physical
-from salt://maint/lib.sls import default_exclude_paths, default_exclude_services
+from salt://maint/config.sls import config
 
 
 if fully_persistent_or_physical() or dom0():
@@ -19,8 +19,8 @@ if fully_persistent_or_physical() or dom0():
     Maint.services_restarted(
         "Restart services",
         require=[updreq],
-        exclude_services_globs=default_exclude_services,
-        exclude_paths=default_exclude_paths,
+        exclude_services_globs=config.update.restart_exclude_services,
+        exclude_paths=config.update.restart_exclude_paths,
     )
     Cmd.run(
         "check ZFS module after",

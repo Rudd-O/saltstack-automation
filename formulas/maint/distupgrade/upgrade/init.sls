@@ -1,7 +1,7 @@
 #!objects
 
 from salt://lib/qubes.sls import dom0, fully_persistent_or_physical
-from salt://maint/lib.sls import default_exclude_paths, default_exclude_services
+from salt://maint/config.sls import config
 
 
 if __salt__["file.file_exists"]("/.distupgrade"):
@@ -54,8 +54,8 @@ elif fully_persistent_or_physical():
         "Restart services",
         require=[Cmd("Refresh ZFS DKMS")],
         require_in=[postup],
-        exclude_services_globs=default_exclude_services,
-        exclude_paths=default_exclude_paths,
+        exclude_services_globs=config.update.restart_exclude_services,
+        exclude_paths=config.update.restart_exclude_paths,
     )
 else:
     Test.nop(

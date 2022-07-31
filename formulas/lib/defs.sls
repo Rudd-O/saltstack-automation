@@ -88,9 +88,9 @@ def as_plain_dict(d):
     return d
 
 
-def PillarConfigWithDefaults(pillar_key, defaults):
+def PillarConfigWithDefaults(pillar_key, defaults, merge_lists=False):
     user = __salt__["pillar.get"](pillar_key, {})
-    config = __salt__["slsutil.merge"](defaults, user)
+    config = __salt__["slsutil.merge"](defaults, user, merge_lists=merge_lists)
     return Dotdict(config)
 
 
