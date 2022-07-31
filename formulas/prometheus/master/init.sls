@@ -1,6 +1,6 @@
 #!pyobjects
 
-from salt://lib/qubes.sls import Qubify, dom0, fully_persistent_or_physical, rw_only_or_physical
+from salt://lib/qubes.sls import dom0, fully_persistent_or_physical, rw_only_or_physical
 from salt://lib/defs.sls import Perms
 
 
@@ -18,7 +18,7 @@ if fully_persistent_or_physical() and not dom0():
         require=[Test('repo deployed')],
     ):
         for svc in svcs:
-            Qubify(svc)
+            Qubes.enable_dom0_managed_service(svc)
     File.directory(
         '/etc/amtool',
         **Perms.dir
