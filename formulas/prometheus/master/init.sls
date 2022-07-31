@@ -49,7 +49,7 @@ if rw_only_or_physical() and not dom0():
     for d in ["/var/lib/prometheus/data", "/var/lib/prometheus/alertmanager"]:
         File.directory(
             d,
-            require=[Pkg("prometheus-packages"] if grains('qubes:persistence') == "" else [],
+            require=[Pkg("prometheus-packages") if grains('qubes:persistence') == "" else [],
             require_in=[Qubes("prometheus")],
             **perms.owner_dir
         )
