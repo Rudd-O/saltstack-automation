@@ -17,6 +17,7 @@ server:
 client:
   rpm:
     repo_name: dnf-updates
+    metadata_expire: 1800
 mirror:
   selinux_repo_context: httpd_sys_content_t
   paths:
