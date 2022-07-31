@@ -18,7 +18,10 @@ if fully_persistent_or_physical() and not dom0():
         require=[Test('repo deployed')],
     ):
         for svc in svcs:
-            Qubes.enable_dom0_managed_service(svc)
+            Qubes.enable_dom0_managed_service(
+                "Qubes dom0 service " + svc,
+                name=svc,
+            )
     File.directory(
         '/etc/amtool',
         **Perms.dir
