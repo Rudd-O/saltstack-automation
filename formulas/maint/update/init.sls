@@ -19,8 +19,8 @@ if fully_persistent_or_physical() or dom0():
     Maint.services_restarted(
         "Restart services",
         require=[updreq],
-        exclude_services_globs=config.update.restart_exclude_services,
-        exclude_paths=config.update.restart_exclude_paths,
+        exclude_services_globs=config['update'].restart_exclude_services,
+        exclude_paths=config['update'].restart_exclude_paths,
     )
     Cmd.run(
         "check ZFS module after",

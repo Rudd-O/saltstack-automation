@@ -54,8 +54,8 @@ elif fully_persistent_or_physical():
         "Restart services",
         require=[Cmd("Refresh ZFS DKMS")],
         require_in=[postup],
-        exclude_services_globs=config.update.restart_exclude_services,
-        exclude_paths=config.update.restart_exclude_paths,
+        exclude_services_globs=config['update'].restart_exclude_services,
+        exclude_paths=config['update'].restart_exclude_paths,
     )
 else:
     Test.nop(
