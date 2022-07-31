@@ -38,7 +38,7 @@ def run(cmd):
 
 
 os.umask(0o0022) # world readable
-repo = os.path.abspath("{{ root }}")
+repo = os.path.abspath({{ root }})
 
 
 for mustbe in mustbes:

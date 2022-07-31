@@ -38,12 +38,12 @@ def run(cmd):
 
 
 os.umask(0o0022) # world readable
-repo = os.path.abspath("{{ base_dir }}")
+repo = os.path.abspath({{ base_dir }})
 
 for mustbe in mustbes:
     if mustbe == cmd[:len(mustbe)]:
         if mustbe == ["mirror"]:
-            sys.exit(run(["rsync", "-aHv", "--delete", "--", repo + "/", "{{ mirror_host }}:"]))
+            sys.exit(run(["rsync", "-aHv", "--delete", "--", repo + "/", {{ mirror_host }} + ":"]))
 
         arg = cmd[-1]
         dest = os.path.abspath(os.path.join(repo, arg))
@@ -61,6 +61,6 @@ for mustbe in mustbes:
             rets.append(run(["createrepo_c", "--update", "-o", release, release]))
         if not rets or rets[-1] == 0:
             relrelease = os.path.relpath(release, repo)
-            rets.append(run(["rsync", "-aH", "--delete", "--", release + "/", "{{ mirror_host }}:" + relrelease + "/"]))
+            rets.append(run(["rsync", "-aH", "--delete", "--", release + "/", {{ mirror_host }} + ":" + relrelease + "/"]))
         sys.exit(rets[-1])
 unauth(cmd)

@@ -12,8 +12,8 @@ File.managed(
   source=f"salt://{slsp}/artifactsh.j2",
   template="jinja",
   context={
-      "mirror_host": context.rpm.mirror.host,
-      "base_dir": context.rpm.paths.root,
+      "mirror_host": repr(context.rpm.mirror.host),
+      "base_dir": repr(context.rpm.paths.root),
   },
   **Perms.dir,
 )

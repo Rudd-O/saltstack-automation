@@ -13,7 +13,7 @@ perms = Perms("mirrorer")
 
 milestone = Test.nop("mirror deployed").requisite
 
-File.directory(
+perms = File.directory(
     "Permissions for repo directory",
     name=context.paths.root,
     require=[
@@ -23,6 +23,20 @@ File.directory(
         Cmd("reload nginx"),
         SshAuth("access to mirrorer"),
     ],
-    require_in=[milestone],
     **perms.dir,
+).requisite
+
+policy = Selinux.fcontext_policy_present(
+    "SELinux context for repo directory",
+    name=context.paths.root + "(/.*)?",
+    sel_type=context.selinux_repo_context,
+    require=[perms],
+).requisite
+
+Selinux.fcontext_policy_applied(
+    "SELinux context applied",
+    name=context.paths.root,
+    recursive=True,
+    require_in=[milestone],
+    require=[policy],
 )

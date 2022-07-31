@@ -11,8 +11,9 @@ slsp = "/".join(sls.split(".")[:-1])
 
 shell = File.managed(
     "/usr/local/bin/mirrorersh",
-    source="salt://{slsp}/mirrorersh.j2",
-    context={"root": root},
+    source=f"salt://{slsp}/mirrorersh.j2",
+    template="jinja",
+    context={"root": repr(root)},
     **Perms.dir,
 ).requisite
 

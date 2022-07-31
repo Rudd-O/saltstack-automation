@@ -18,6 +18,7 @@ client:
   rpm:
     repo_name: dnf-updates
 mirror:
+  selinux_repo_context: httpd_sys_content_t
   paths:
     root: /srv/repo
 """)
