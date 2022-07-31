@@ -25,6 +25,26 @@ alertmanager:
   inhibit_rules: {}
 """ % (fqdn, fqdn))
 
+# FYI: the following is the default Alertmanager configuration.
+"""
+route:
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 1h
+  receiver: 'web.hook'
+receivers:
+  - name: 'web.hook'
+    webhook_configs:
+      - url: 'http://127.0.0.1:5001/'
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'dev', 'instance']
+"""
+
 config = PillarConfigWithDefaults("prometheus", defaults)
 
 ShowConfig(config)
