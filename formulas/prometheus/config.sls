@@ -20,7 +20,11 @@ master:
 alertmanager:
   url: http://%s:9093/
   global: {}
-  route: {}
+  route:
+    group_by: ['alertname']
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 1h
   receivers: []
   inhibit_rules: []
 """ % (fqdn, fqdn))
@@ -28,10 +32,6 @@ alertmanager:
 # FYI: the following is the default Alertmanager configuration.
 """
 route:
-  group_by: ['alertname']
-  group_wait: 30s
-  group_interval: 5m
-  repeat_interval: 1h
   receiver: 'web.hook'
 receivers:
   - name: 'web.hook'
@@ -46,5 +46,17 @@ inhibit_rules:
 """
 
 config = PillarConfigWithDefaults("prometheus", defaults)
+if "receiver" not in config.alertmanager.route:
+  config.alertmanager.receivers = config.alertmanager.receivers + [
+    {
+      "name": "web-hook",
+      "webhook_configs": [
+        {
+          "url": "http://127.0.0.1:5001/"
+        }
+      ]
+    }
+  ]
+  config.alertmanager.route.receiver = "web-hook"
 
 ShowConfig(config)
