@@ -11,9 +11,9 @@ include:
   - enable: yes
   - watch:
     - mypkg: {{ name }}
-#    - file: /etc/default/prometheus-xentop
+    - file: /etc/default/{{ name }}
 
-# /etc/default/{{ name }}
-#   file.managed:
-#   - contents: |
-#       ARGS="-bind :9104"
+/etc/default/{{ name }}
+  file.managed:
+  - contents: |
+      PROMETHEUS_VARNISH_EXPORTER_OPTS=""
