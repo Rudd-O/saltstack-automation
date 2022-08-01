@@ -21,8 +21,8 @@ alertmanager:
   url: http://%s:9093/
   global: {}
   route: {}
-  receivers: {}
-  inhibit_rules: {}
+  receivers: []
+  inhibit_rules: []
 """ % (fqdn, fqdn))
 
 # FYI: the following is the default Alertmanager configuration.
