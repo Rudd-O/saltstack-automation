@@ -39,8 +39,8 @@ if rw_only_or_physical() and not dom0():
             "Install grafana plugins",
             name="""
     set -e
-    grafana-cli plugins ls | grep camptocamp-prometheus-alertmanager-datasource || {
-        grafana-cli plugins install camptocamp-prometheus-alertmanager-datasource
+    grafana-cli plugins ls | grep camptocamp-prometheus-alertmanager-datasource >&2 || {
+        grafana-cli plugins install camptocamp-prometheus-alertmanager-datasource >&2
         echo
         echo changed=yes
     }
