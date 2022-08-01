@@ -13,7 +13,7 @@ include:
     - mypkg: {{ name }}
     - file: /etc/default/{{ name }}
 
-/etc/default/{{ name }}
+/etc/default/{{ name }}:
   file.managed:
   - contents: |
       PROMETHEUS_VARNISH_EXPORTER_OPTS=""
