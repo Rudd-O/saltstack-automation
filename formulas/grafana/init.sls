@@ -6,7 +6,6 @@ from salt://grafana/config.sls import config
 
 
 pkgs = ["grafana"]
-svcs = pkgs[:]
 
 
 if fully_persistent_or_physical() and not dom0():
@@ -16,19 +15,17 @@ if fully_persistent_or_physical() and not dom0():
         pkgs=pkgs,
         require=[Test('grafana repo deployed')],
     ):
-        for svc in svcs:
-            Qubify(svc)
+        Qubify("grafana-server")
     p = [Pkg("grafana-packages")]
 else:
     p = []
 
 
 if rw_only_or_physical() and not dom0():
-    for svc in svcs:
-        Service.running(svc, require=[Qubes('grafana bind')])
+    Service.running("grafana-server", require=[Qubes('grafana bind')])
     var = File.directory("/var/lib/grafana", require=p, user="root", group="grafana", mode="0770").requisite
     plugins = File.directory("/var/lib/grafana/plugins", require=[var], user="root", group="grafana", mode="0770").requisite
-    with Service("grafana", "watch_in"):
+    with Service("grafana-server", "watch_in"):
         config = File.managed(
             '/etc/grafana/grafana.ini',
             source="salt://grafana/grafana.ini.j2",
