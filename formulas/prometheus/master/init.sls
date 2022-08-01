@@ -90,7 +90,7 @@ if rw_only_or_physical() and not dom0():
     with Service("alertmanager", "watch_in"):
         File.managed(
             '/etc/default/alertmanager',
-            contents="ALERTMANAGER_OPTS='--web.external-url={{ url }} --storage.path=/var/lib/prometheus/data' --config.file=/etc/prometheus/alertmanager.yml",
+            contents="ALERTMANAGER_OPTS='--web.external-url={{ url }} --storage.path=/var/lib/prometheus/data --config.file=/etc/prometheus/alertmanager.yml'",
             template='jinja',
             context=config.alertmanager,
             require=[Pkg("prometheus-packages")] if grains('qubes:persistence') == "" else [],
