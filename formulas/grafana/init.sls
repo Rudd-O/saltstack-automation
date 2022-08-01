@@ -15,7 +15,7 @@ if fully_persistent_or_physical() and not dom0():
         pkgs=pkgs,
         require=[Test('grafana repo deployed')],
     ):
-        Qubify("grafana-server")
+        Qubes.enable_dom0_managed_service("grafana-server")
     p = [Pkg("grafana-packages")]
 else:
     p = []
