@@ -25,9 +25,9 @@
 
 # my global config
 global:
-  scrape_interval:     5s
-  evaluation_interval: 5s
-  scrape_timeout:      4s
+  scrape_interval:     {{ global.scrape_interval }}
+  evaluation_interval: {{ global.evaluation_interval }}
+  scrape_timeout:      {{ global.scrape_timeout }}
 
 rule_files:
 - alerting.rules

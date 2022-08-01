@@ -10,6 +10,10 @@ defaults = yaml.safe_load("""
 master:
   url: http://%s:9090/
   retention: 90GB
+  global:
+    scrape_interval: 60s
+    scrape_timeout: 59s
+    evaluation_interval: 60s
   recording_rules: {}
   alerting_rules: {}
   scrapers:
