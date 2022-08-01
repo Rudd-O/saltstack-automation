@@ -47,7 +47,7 @@ enforce_domain = true
 # The full public facing url you use in browser, used for redirects and emails
 # If you use reverse proxy and sub path specify full url (with sub path)
 root_url = {{ grafana.root_url }}
-serve_from_sub_path = {{ grafana.serve_from_sub_path }}
+serve_from_sub_path = {{ grafana.serve_from_sub_path | json }}
 
 # Log web requests
 ;router_logging = false
