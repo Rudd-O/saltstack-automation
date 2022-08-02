@@ -178,6 +178,7 @@ ConditionPathExists=/var/run/qubes-service/%s
         user="root",
         group="root",
         mode="0644",
+        makedirs=True,
     )
 
     if ret2["result"] is False:
