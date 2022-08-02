@@ -16,6 +16,8 @@ master:
     evaluation_interval: 60s
   recording_rules: {}
   alerting_rules: {}
+  aliases: {}
+  proxy_addresses: {}
   scrapers:
     direct: {}
     snmp: {}

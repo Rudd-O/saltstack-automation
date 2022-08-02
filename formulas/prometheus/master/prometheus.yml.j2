@@ -40,6 +40,65 @@ alerting:
 
 scrape_configs:
 
+  - job_name: relabel_config_holder
+    relabel_configs: &relabel_configs
+    - 
+      source_labels: [job]
+      regex: (.+) .+
+      target_label: job
+      replacement: ${1}
+    - 
+      source_labels: [__address__]
+      regex: "(.+):(.+) at (.+) .*"
+      replacement: ${1}
+      target_label: instance
+    - 
+      source_labels: [__address__]
+      regex: "(.+):(.+) at (.+) (on.*|via.*|direct)"
+      replacement: ${3}
+      target_label: location
+
+    # Proxied scrapers.
+    - 
+      source_labels: [__address__]
+      regex: "(.+):(.+) at (.+) via (.+):(.+)(/.+)"
+      replacement: ${1}
+      target_label: __param_target
+    - 
+      source_labels: [__address__]
+      regex: "(.+):(.+) at (.+) via (.+):(.+)(/.+)"
+      replacement: ${2}
+      target_label: __param_port
+    - 
+      source_labels: [__address__]
+      regex: "(.+):(.+) at (.+) via (.+):(.+)(/.+)"
+      replacement: ${6}
+      target_label: __metrics_path
+    - 
+      source_labels: [__address__]
+      regex: "(.+):(.+) at (.+) via (.+):(.+)(/.+)"
+      replacement: ${4}:${5}
+      target_label: __address__
+
+    # Aliased scrapers.
+    - 
+      source_labels: [__address__]
+      regex: "(.+):(.+) at (.+) on (.+):(.+)(/.+)"
+      replacement: ${6}
+      target_label: __metrics_path
+    - 
+      source_labels: [__address__]
+      regex: "(.+):(.+) at (.+) on (.+):(.+)(/.+)"
+      replacement: ${4}:${5}
+      target_label: __address__
+
+    # Direct scrapers.
+    - 
+      source_labels: [__address__]
+      regex: "(.+):(.+) at (.+) direct"
+      replacement: ${1}:${2}
+      target_label: __address__
+
 {%-for scraper_type, data in scrapers.blackbox.items() %}
 {%-  for scraper_location, data in data.items() %}
 {%-    set sources = data["sources"] %}
@@ -142,56 +201,19 @@ scrape_configs:
     static_configs:
     - targets:
 {%-  for target in data.targets %}
-      - {{ target }}:{{ data.port }} at {{ data.location }}{% if target in proxy_addresses %} via {{ proxy_addresses[target] }}{% endif %}
+      - {{ target }}:{{ data.port }} at {{ data.location }}{%
+            if target in proxy_addresses
+        %} via {{ proxy_addresses[target] }}/forward{%
+            elif target in aliases
+        %} on {{ aliases[target] }}:{{ data.port }}/metrics{%
+            else
+        %} direct{%
+            endif
+        %}
 {%-  endfor %}
-    relabel_configs:
-    - source_labels: [job]
-      regex: (proxy|direct)_(.*)
-      target_label: job
-      replacement: ${2}
-    - source_labels: [__address__]
-      regex: (.+):(.+) at (.+)
-      replacement: ${1}
-      target_label: instance
+    relabel_configs: *relabel_configs
 
-    - source_labels: [__address__]
-      regex: (.+):(.+) at (.+)
-      target_label: location
-      replacement: ${3}
-    - source_labels: [__address__]
-      regex: (.+):(.+) at (.+) via (.+)
-      target_label: location
-      replacement: ${3}
-
-    - source_labels: [__address__]
-      regex: ([a-z0-9]+)([.].*|):(.+) at (.+) via (.+)
-      replacement: ${1}
-      target_label: __param_target
-    - source_labels: [__address__]
-      regex: ([a-z0-9]+)([.].*|):(.+) at (.+) via (.+)
-      replacement: /forward
-      target_label: __metrics_path__
-    - source_labels: [__address__]
-      regex: (.+):(.+) at (.+) via (.+)
-      replacement: ${2}
-      target_label: __param_port
-
-    - source_labels: [__address__]
-      regex: (.+):(.+) at (.+) via (.+)
-      replacement: ${4}
-      target_label: __address__
-    - source_labels: [__address__]
-      regex: (.+):(.+) at (.+)
-      replacement: ${1}:${2}
-      target_label: __address__
-
-{%-   if 'job_name' in data %}
-    - source_labels: [job]
-      replacement: {{ data.job_name }}
-      target_label: job
-{%-   endif %}
-
-{%- if scraper == "plone" %}
+{%- if scraper.startswith("plone") %}
     metric_relabel_configs:
     - source_labels: [__name__]
       regex: zope_connection_([0-9])+_(.*)
