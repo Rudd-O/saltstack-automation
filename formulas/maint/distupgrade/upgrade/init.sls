@@ -17,10 +17,10 @@ preup = Test.nop("Preupgrade").requisite
 postup = Test.nop("Postupgrade").requisite
 
 
-
 if dom0():
     assert 0, "not supported"
 elif fully_persistent_or_physical():
+    include("needs-restart")
     File.managed(
         "Create distupgrade marker",
         name="/.distupgrade",
@@ -52,7 +52,7 @@ elif fully_persistent_or_physical():
     )
     Maint.services_restarted(
         "Restart services",
-        require=[Cmd("Refresh ZFS DKMS")],
+        require=[Cmd("Refresh ZFS DKMS"), Test("needs-restart deployed")],
         require_in=[postup],
         exclude_services_globs=config['update'].restart_exclude_services,
         exclude_paths=config['update'].restart_exclude_paths,
