@@ -98,7 +98,13 @@ def get(key, create=True, vm=None):
         a.append("get-or-generate")
     a.append("--")
     a.append(key)
-    return cmd_with_serialization(a, universal_newlines=True, bufsize=0)[:-1]
+    try:
+        return cmd_with_serialization(a, universal_newlines=True, bufsize=0)[:-1]
+    except subprocess.CalledProcessError as e:
+        if e.returncode == 8:
+            # FIXME proper error handling: https://github.com/saltstack/salt/issues/43187
+            raise KeyError(key)
+        raise
 
 
 def get_multiline(key, vm=None):
@@ -110,7 +116,13 @@ def get_multiline(key, vm=None):
         key = os.path.sep.join(key)
     a.append("--")
     a.append(key)
-    return cmd_with_serialization(["qvm-pass", key], universal_newlines=True, bufsize=0)
+    try:
+        return cmd_with_serialization(["qvm-pass", key], universal_newlines=True, bufsize=0)
+    except subprocess.CalledProcessError as e:
+        if e.returncode == 8:
+            # FIXME proper error handling: https://github.com/saltstack/salt/issues/43187
+            raise KeyError(key)
+        raise
 
 
 def get_json(key, vm=None):
