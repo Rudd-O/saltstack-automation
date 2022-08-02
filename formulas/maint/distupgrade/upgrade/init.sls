@@ -20,7 +20,8 @@ postup = Test.nop("Postupgrade").requisite
 if dom0():
     assert 0, "not supported"
 elif fully_persistent_or_physical():
-    include("needs-restart")
+    if grains("os") == "Fedora":
+        include("needs-restart")
     File.managed(
         "Create distupgrade marker",
         name="/.distupgrade",
@@ -49,14 +50,16 @@ elif fully_persistent_or_physical():
         name="salt://maint/update/refresh-zfs-dkms.sh",
         args="force",
         stateful=True,
-    )
-    Maint.services_restarted(
-        "Restart services",
-        require=[Cmd("Refresh ZFS DKMS"), Test("needs-restart deployed")],
         require_in=[postup],
-        exclude_services_globs=config['update'].restart_exclude_services,
-        exclude_paths=config['update'].restart_exclude_paths,
     )
+    if grains("os") == "Fedora":
+        Maint.services_restarted(
+            "Restart services",
+            require=[Cmd("Refresh ZFS DKMS"), Test("needs-restart deployed")],
+            require_in=[postup],
+            exclude_services_globs=config['update'].restart_exclude_services,
+            exclude_paths=config['update'].restart_exclude_paths,
+        )
 else:
     Test.nop(
         "This VM is not to be upgraded.",

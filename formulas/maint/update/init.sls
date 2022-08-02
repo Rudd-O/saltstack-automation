@@ -6,7 +6,8 @@ from salt://maint/config.sls import config
 
 if fully_persistent_or_physical() or dom0():
     tpl = "set -x ; mkdir -p /var/cache/salt/zfs-dkms ; test -f /var/cache/salt/zfs-dkms/%(stage)s || { rpm -qa | grep zfs-dkms > /var/cache/salt/zfs-dkms/%(stage)s ; } ; echo ; echo changed=no ; exit 0"
-    include("needs-restart")
+    if grains("os") == "Fedora":
+        include("needs-restart")
     Cmd.run(
         "check ZFS module before",
         name=tpl % {"stage": "before"},
@@ -17,12 +18,13 @@ if fully_persistent_or_physical() or dom0():
         require=[Cmd("check ZFS module before")],
     ).requisite
 
-    Maint.services_restarted(
-        "Restart services",
-        require=[updreq, Test("needs-restart deployed")],
-        exclude_services_globs=config['update'].restart_exclude_services,
-        exclude_paths=config['update'].restart_exclude_paths,
-    )
+    if grains("os") == "Fedora":
+        Maint.services_restarted(
+            "Restart services",
+            require=[updreq, Test("needs-restart deployed")],
+            exclude_services_globs=config['update'].restart_exclude_services,
+            exclude_paths=config['update'].restart_exclude_paths,
+        )
     Cmd.run(
         "check ZFS module after",
         name=tpl % {"stage": "after"},

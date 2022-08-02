@@ -73,7 +73,7 @@ scrape_configs:
       source_labels: [__address__]
       regex: "(.+):(.+) at (.+) via (.+):(.+)(/.+)"
       replacement: ${6}
-      target_label: __metrics_path
+      target_label: __metrics_path__
     - 
       source_labels: [__address__]
       regex: "(.+):(.+) at (.+) via (.+):(.+)(/.+)"
@@ -85,7 +85,7 @@ scrape_configs:
       source_labels: [__address__]
       regex: "(.+):(.+) at (.+) on (.+):(.+)(/.+)"
       replacement: ${6}
-      target_label: __metrics_path
+      target_label: __metrics_path__
     - 
       source_labels: [__address__]
       regex: "(.+):(.+) at (.+) on (.+):(.+)(/.+)"
@@ -118,18 +118,14 @@ scrape_configs:
     params:
       module: [{{ scraper_module }}]
     static_configs:
-    - targets:
-{%-    for target in data.targets %}
-      - {{ target }}{% if scraper_location == "home" and not target.startswith("https://") and not target.startswith("http://") and not scraper_type == "tcp" %}.dragonfear{% endif %} 
-{%-    endfor %}
+    - targets: {{ data.targets | json }}
     relabel_configs:
     # Rename the address into the parameter ?target=
     - source_labels: [__address__]
       target_label: __param_target
-    # Rename the parameter value of ?target= into the label instance, removing ".dragonfear" from the end.
+    # Rename the parameter value of ?target= into the label instance.
     - source_labels: [__param_target]
       target_label: instance
-      regex: (.+?)(.dragonfear|$)
       replacement: ${1}
     # Assign the address of the prober to the __address__ that Prometheus will contact.
     - target_label: __address__
