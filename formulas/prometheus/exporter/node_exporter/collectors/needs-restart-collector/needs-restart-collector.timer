@@ -1,0 +1,9 @@
+[Unit]
+Description=Trigger Collect metrics of what services need to be restarted
+
+[Timer]
+OnBootSec=0
+OnUnitActiveSec=1 hours
+
+[Install]
+WantedBy=timers.target

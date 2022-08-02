@@ -1,0 +1,8 @@
+[Unit]
+Description=Collect systemd unit metrics
+PartOf=dnf-automatic.service
+After=dnf-automatic.service
+
+[Service]
+Type=oneshot
+ExecStart={{ exe }} {{ textfile_directory }}/systemd-unit-state.prom

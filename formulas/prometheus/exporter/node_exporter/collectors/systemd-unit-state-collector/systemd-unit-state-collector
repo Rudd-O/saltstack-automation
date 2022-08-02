@@ -1,0 +1,78 @@
+#!/usr/bin/python3
+
+import contextlib
+import os
+import sys
+import subprocess
+
+def unescape(escaped):
+    return escaped.replace("\\", "\\\\")
+
+
+@contextlib.contextmanager
+def atomic_outputter(filename):
+    if filename.startswith("/dev") or filename == "-" or os.path.islink(filename):
+        if filename == "-":
+            filename = "/dev/stdout"
+        tmpf, finalf = filename, filename
+    else:
+        tmpf, finalf = filename + ".%s" % os.getpid(), filename
+    with open(tmpf, "w") as out:
+        try:
+            yield out
+            out.flush()
+        except Exception:
+            if tmpf != finalf:
+                os.unlink(tmpf)
+            raise
+    if tmpf != finalf:
+        if os.stat(tmpf).st_size == 0:
+            os.unlink(tmpf)
+        else:
+            os.rename(tmpf, finalf)
+
+
+p_ = subprocess.Popen("systemctl show * -p Id,ActiveState,SubState".split(),
+                      stdout=subprocess.PIPE,
+                      stdin=open(os.devnull),
+                      universal_newlines=True)
+in_ = p_.stdout.read()
+ret_ = p_.wait()
+
+with atomic_outputter(sys.argv[1]) as out:
+    def unitadd(d, unit):
+        if len(d) != 2: return
+        for src, dst in [
+            ("Id", "service"),
+            ("ActiveState", "state"),
+            ("SubState", "substate"),
+        ]:
+            if d[0] == src:
+                d[0] = dst
+        try:
+            unit[d[0]] = d[1]
+        except IndexError:
+            assert 0, d
+    def unitflush(unit, flushed):
+        if not unit: return
+        if unit["service"].endswith(".device"):
+            return
+        if not flushed:
+            print("# HELP systemd_unit_state Tracks the state of a systemd unit.", file=out)
+            flushed = True
+        out.write("systemd_unit_state{")
+        out.write(",".join(
+            k + "=" + '"' + unescape(v) + '"'
+            for k, v in sorted(unit.items())
+        ))
+        out.write("} 1\n")
+        unit.clear()
+    flushed = False
+    unit = {}
+    for line in in_.splitlines(True):
+        if line != '\n':
+            unitadd(line.strip().split("=", 1), unit)
+        else:
+            unitflush(unit, flushed)
+            flushed = True
+    unitflush(unit, flushed)

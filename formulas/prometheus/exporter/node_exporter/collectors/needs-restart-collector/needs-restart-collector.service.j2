@@ -1,0 +1,8 @@
+[Unit]
+Description=Collect metrics of what services need to be restarted
+PartOf=dnf-automatic.service
+After=dnf-automatic.service
+
+[Service]
+Type=oneshot
+ExecStart={{ exe }} {{ textfile_directory }}/needs-restart-collector.prom
