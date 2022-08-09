@@ -6,10 +6,27 @@ from salt://lib/qubes.sls import template, fully_persistent_or_physical
 
 if fully_persistent_or_physical():
     with Pkg.installed("nginx"):
-        Qubes.enable_dom0_managed_service("nginx")
-    deps = [Qubes("nginx")]
+        dropin = File.managed(
+            "/etc/systemd/system/nginx.service.d/ulimits.conf",
+            contents="""[Service]
+LimitNOFILE=1048576
+LimitNOFILESoft=1048576
+""",
+        ).requisite
+    daemonreload = Cmd.run(
+        "Reload NginX service file",
+        name="systemctl --system daemon-reload",
+        onchanges=[dropin],
+    ).requisite
+    svc = Qubes.enable_dom0_managed_service(
+        "nginx",
+        require=[daemonreload],
+    ).requisite
+    deps = [svc]
+    dropin = [dropin]
 else:
     deps = []
+    dropin = []
 
 if not template():
     certbot_webroot = "/etc/letsencrypt/webroot"
@@ -33,9 +50,7 @@ if not template():
     Service.running(
         "nginx running in HTTP-only mode",
         name="nginx",
-        watch=[
-            File("/etc/nginx/nginx.conf"),
-        ],
+        watch=[File("/etc/nginx/nginx.conf")] + dropin,
         require=deps,
     )
 

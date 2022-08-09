@@ -13,7 +13,13 @@ root_url: http://%s:3000
 # Set serve_from_sub_path to true if the root_url contains a subpath
 # because you are serving Grafana through a frontend proxy.
 serve_from_sub_path: false
-admin_username: admin
+auth:
+  admin_username: admin
+  # Set this to true to enable anonymous access.
+  # See https://grafana.com/docs/grafana/latest/setup-grafana/configure-security/configure-authentication/grafana/#anonymous-authentication
+  anonymous: false
+  # Set this to the default organization anonymous users will see.
+  anonymous_org: ""
 """ % (grains("id"), grains("fqdn"), grains("fqdn")))
 
 config = PillarConfigWithDefaults("grafana", defaults)

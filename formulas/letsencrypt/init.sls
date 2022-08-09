@@ -56,7 +56,7 @@ if not template():
             key = privkey_path(host)
 
             if fake_for(host):
-                if not (salt.file.file_exists(cert) and salt.file.file_exists(key)):
+                if not (salt.file.file_exists(cert) and salt.file.file_exists(key)): # FIXME this could be replaced by cmd.run with creates=
                     C = Cmd.run
                     cmd = 'openssl req -x509 -out /tmp/%(host)s.crt -keyout /tmp/%(host)s.key -newkey rsa:2048 -nodes -sha256 -subj "/CN=%(host)s" -extensions EXT -config <( printf "[dn]\nCN=%(host)s\n[req]\ndistinguished_name = dn\n[EXT]\nsubjectAltName=DNS:%(host)s\nkeyUsage=digitalSignature\nextendedKeyUsage=serverAuth") && mkdir -p $(dirname %(cert)s) && mv /tmp/%(host)s.key %(key)s && mv /tmp/%(host)s.crt %(cert)s'
                     cmd = cmd % locals()
@@ -69,7 +69,7 @@ if not template():
                     raise KeyError("a renewal_email is needed by default in letsencrypt pillar or for the host")
                 account_number = data.get("account_number", None)
 
-                if not (salt.file.file_exists(cert) and salt.file.file_exists(key)):
+                if not (salt.file.file_exists(cert) and salt.file.file_exists(key)): # FIXME this could be replaced by cmd.run with creates=
                     C = Cmd.run
                     quoted_renewal_email = quote(renewal_email)
                     quoted_webroot = quote(certbot_webroot)

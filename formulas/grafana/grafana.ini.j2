@@ -143,10 +143,10 @@ check_for_updates = false
 #################################### Security ####################################
 [security]
 # default admin user, created on startup
-admin_user = {{ grafana.admin_username }}
+admin_user = {{ grafana.auth.admin_username }}
 
 # default admin password, can be changed before first start of grafana,  or in profile settings
-admin_password = {{ grafana.admin_password }}
+admin_password = {{ grafana.auth.admin_password }}
 
 # used for signing
 ;secret_key = SW2YcwTIb9zpOOhoPsMm
@@ -238,10 +238,14 @@ allow_org_create = false
 #################################### Anonymous Auth ######################
 [auth.anonymous]
 # enable anonymous access
-enabled = true
+enabled = {% if grafana.auth.anonymous %}true{% else %}false{% endif %}
 
 # specify organization name that should be used for unauthenticated users
+{%- if grafana.auth.anonymous_org | default("") %}
+org_name = {{ grafana.auth.anonymous_org }}
+{%- else %}
 ;org_name = Main Org.
+{%- endif %}
 
 # specify role for unauthenticated users
 ;org_role = Viewer
