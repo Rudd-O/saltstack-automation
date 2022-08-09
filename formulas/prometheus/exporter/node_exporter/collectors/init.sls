@@ -7,7 +7,7 @@ if grains("os") == "Fedora":
     include(sls + ".needs-restart-collector")
 include(sls + ".systemd-unit-state-collector")
 
-if template()
+if template():
     reqs = []
 else:
     reqs=  [
