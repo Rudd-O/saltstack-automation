@@ -7,7 +7,8 @@ from salt://prometheus/exporter/node_exporter/config.sls import config
 include(sls + ".systemd")
 daemonreload = Cmd("Reload systemd for node exporter")
 
-name = sls.split(".")[-1]
+debian = grains("os") in ("Debian", "Ubuntu")
+name = "prometheus-node-exporter" if debian else sls.split(".")[-1]
 slsp = sls.replace(".", "/")
 
 include(sls + ".collectors")
@@ -19,7 +20,7 @@ if updateable():
 
     p = Mypkg.installed(
         f"{name}-pkg",
-        name="prometheus-node-exporter" if grains("os") in ("Debian", "Ubuntu") else name,
+        name=name,
         require=[Test("RPM repo deployed")],
         require_in=[] if template() else [File(textfile_directory)],
     ).requisite
@@ -40,10 +41,11 @@ if updateable():
     ).requisite
 
     notimex = "" if physical() else "--no-collector.timex "
+    OPTS = "ARGS" if debian else "NODE_EXPORTER_OPTS"
     conf = File.managed(
         f"/etc/default/{name}",
         contents=f"""
-    NODE_EXPORTER_OPTS='{notimex}--collector.nfs --collector.nfsd --collector.textfile --collector.textfile.directory={textfile_directory} --collector.logind --collector.filesystem.ignored-fs-types="^(nfs4|autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$"'
+    {OPTS}='{notimex}--collector.nfs --collector.nfsd --collector.textfile --collector.textfile.directory={textfile_directory} --collector.logind --collector.filesystem.ignored-fs-types="^(nfs4|autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$"'
     """.lstrip(),
         require=[p],
     ).requisite
