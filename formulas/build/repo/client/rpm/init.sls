@@ -11,7 +11,7 @@ from salt://build/repo/config.sls import config
 
 r = Test.nop('RPM repo deployed').requisite
 
-if not rw_only():
+if not rw_only() and config.client.rpm.get("base_url"):
     context = config.client.rpm
     slsp = sls.replace(".", "/")
     k = File.managed(
