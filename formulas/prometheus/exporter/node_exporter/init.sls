@@ -19,7 +19,7 @@ if updateable():
 
     p = Mypkg.installed(
         f"{name}-pkg",
-        name=name,
+        name="prometheus-node-exporter" if grains("os") in ("Debian", "Ubuntu") else name,
         require=[Test("RPM repo deployed")],
         require_in=[] if template() else [File(textfile_directory)],
     ).requisite
