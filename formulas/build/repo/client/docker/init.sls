@@ -10,7 +10,7 @@ from salt://build/repo/config.sls import config
 
 r = Test.nop('Docker repo deployed').requisite
 
-if not rw_only():
+if not rw_only() and "registry_url" in config.client.docker:
     context = config.client.docker
     slsp = sls.replace(".", "/")
     cfg = File.managed(
