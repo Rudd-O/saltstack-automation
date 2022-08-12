@@ -189,7 +189,7 @@ scrape_configs:
 
 {% for scraper, data in scrapers.direct.items() %}
   - job_name: '{{ scraper }}'
-{%-  for record in ["scrape_interval", "scrape_timeout", "metrics_path", "authorization"] %}
+{%-  for record in ["scrape_interval", "scrape_timeout", "metrics_path", "scheme", "authorization"] %}
 {%-    if record in data %}
     {{ record }}: {{ data[record] | json }}
 {%-    endif %}

@@ -44,7 +44,7 @@ if not template():
                 context={
                     "ports": [443],
                     "server_name": server_name,
-                    "max_upload_size": "1000M",
+                    "max_upload_size": context.get("max_upload_size", "1000M"),
                     "ssl_certificate": cert,
                     "ssl_certificate_key": key,
                     "hsts": context.get("hsts", True),
