@@ -25,6 +25,7 @@ default_exclude_paths = [
     "/run",
     "/home",
     "/tmp",
+    "/memfd",
 ]
 
 defaults = {
