@@ -6,9 +6,13 @@ services=$(
     )
 )
 move=0
+declare -A DATA
 for service in $services ; do
   move=1
-  echo "services_pending_restart{service=\"$service\"} 1" >> "$1".$$
+  if [ -z ${DATA[$service]} ] ; then
+    echo "services_pending_restart{service=\"$service\"} 1" >> "$1".$$
+    DATA["$service"]=1
+  fi
 done
 if [ "$move" == "1" ] ; then
   mv -f "$1".$$ "$1"
