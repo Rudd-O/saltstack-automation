@@ -47,6 +47,9 @@ do
             $cmd dkms install -k "$kver" zfs/"$zfsver" >&2
             if test -f /boot/initramfs-"$kver".img ; then
                 $cmd cp -f /boot/initramfs-"$kver".img /boot/initramfs-"$kver".img.knowngood >&2
+                if test -f /boot/efi/EFI/*/initramfs-"$kver".img ; then
+                    $cmd cp -f /boot/initramfs-"$kver".img /boot/efi/EFI/*/initramfs-"$kver".img >&2
+                fi
             fi
             $cmd dracut -f --kver "$kver" >&2
             changed=yes
