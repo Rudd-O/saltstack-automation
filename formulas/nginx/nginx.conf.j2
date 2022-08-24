@@ -11,7 +11,7 @@ pid /run/nginx.pid;
 include /usr/share/nginx/modules/*.conf;
 
 events {
-    worker_connections 1024;
+    worker_connections 65536;
 }
 
 http {
@@ -34,7 +34,7 @@ http {
 
     ssl_ciphers PROFILE=SYSTEM;
     ssl_prefer_server_ciphers on;
-    ssl_session_cache shared:SSL:1m;
+    ssl_session_cache shared:SSL:16m;
     ssl_session_timeout 10m;
 
     sendfile            on;
