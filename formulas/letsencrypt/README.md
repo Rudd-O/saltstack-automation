@@ -9,8 +9,13 @@ letsencrypt:
   renewal_email: toby@example.com
   hosts:
     example.org: {}
+    www.example.org: {}
     example.com: {}
+    www.example.com: {}
 ```
+
+Note that requesting a certificate for `x.com` will not give you a certificate
+valid both for `x.com` and `www.x.com`.  You have to list them separately.
 
 You can also generate self-signed certificates with the following pillar:
 

@@ -25,22 +25,43 @@ if not template():
     else:
 
         for server_name in server_names:
-            if server_name.startswith("www.") and server_name[4:] in server_names:
-                # This is probably a www.example.org / example.org
-                # certificate. Proceed as-is with the same certificate
-                # as for the domain name.
-                domain_name = server_name[4:]
+            if hasattr(server_name, "items"):
+                canonical = server_name["canonical"]
+                server_name = server_name["name"]
             else:
-                domain_name = server_name
+                canonical = None
 
-            cert = fullchain_path(domain_name)
-            key = privkey_path(domain_name)
+            cert = fullchain_path(server_name)
+            key = privkey_path(server_name)
+
+            redirect_config = f"""
+                            rewrite ^/$ https://{canonical} permanent;
+                            rewrite ^/(.*)$ https://{canonical}/$1 permanent;
+""".strip()
+            proxy_pass_config = f"""
+                            # Varnish configuration.
+                            proxy_buffering off;
+                            proxy_request_buffering off;
+                            # End Varnish configurations.
+
+                            proxy_set_header X-Forwarded-For $remote_addr;
+                            proxy_set_header X-Forwarded-Proto $scheme;
+                            proxy_set_header Host $host;
+                            proxy_pass http://{backend};
+""".strip()
+
+            if canonical:
+                location_config = redirect_config
+            else:
+                location_config = proxy_pass_config
+
             File.managed(
                 "/etc/nginx/conf.d/vhosts/%s.conf" % server_name,
                 name="/etc/nginx/conf.d/vhosts/%s.conf" % server_name,
                 source="salt://nginx/vhost.conf.j2",
                 template="jinja",
                 makedirs=True,
+
                 context={
                     "ports": [443],
                     "server_name": server_name,
@@ -50,15 +71,7 @@ if not template():
                     "hsts": context.get("hsts", True),
                     "server_config": """
                         location / {
-                            # Varnish configuration.
-                            proxy_buffering off;
-                            proxy_request_buffering off;
-                            # End Varnish configurations.
-
-                            proxy_set_header X-Forwarded-For $remote_addr;
-                            proxy_set_header X-Forwarded-Proto $scheme;
-                            proxy_set_header Host $host;
-                            proxy_pass http://%(backend)s;
+                            %(location_config)s
                         }
                     """ % locals(),
                 },
