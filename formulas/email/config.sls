@@ -1,6 +1,6 @@
 #!objects
 
-import yaml
+from salt://lib/defs.sls import PillarConfigWithDefaults, ShowConfig
 
 # FIXME:
 # also make the checker check for DKIM records, SPF records, A records and all that good stuff
@@ -39,8 +39,7 @@ defaults = {
         },
     },
 }
-p = pillar("email", {})
-config = __salt__["slsutil.merge"](defaults, p)
+config = PillarConfigWithDefaults("email", defaults)
 
 assert config["mda"]["mailbox_type"] in [
     "maildir",
@@ -97,7 +96,4 @@ for m in "HELO_reject Mail_From_reject PermError_reject TempError_Defer".split()
     if isinstance(config["mta"]["spf"][m], bool):
         config["mta"]["spf"][m] = str(config["mta"]["spf"][m])
 
-Test.nop(
-    "Effective mail configuration for this host:\n\n"
-    + yaml.safe_dump(config, default_flow_style=False)
-)
+ShowConfig(config)
