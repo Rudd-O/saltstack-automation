@@ -261,6 +261,16 @@ def _rule_to_iptables(
             else:
                 parts.extend(["-j", v.upper()])
             seen_action = v
+        elif k == "input_interface":
+            if isinstance(v, str):
+                v = [v]
+            for vvv in v:
+                srcs.append(["-i", vvv])
+        elif k == "output_interface":
+            if isinstance(v, str):
+                v = [v]
+            for vvv in v:
+                dests.append(["-o", vvv])
         elif k == "from":
             vv = resolve(v, homenetwork, nodegroups)
             for vvv in vv:
