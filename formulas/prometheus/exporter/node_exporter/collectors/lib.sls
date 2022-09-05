@@ -28,7 +28,7 @@ def collector(n, ext=None):
             source=f"salt://{slsp}/{n}{ext}",
             template="jinja" if ext else None,
             context={
-                "exclude_services": [],
+                "exclude_services": [".+[.]scope$"],
                 "exclude_paths": config['update'].restart_exclude_paths,
             },
             makedirs=True,
