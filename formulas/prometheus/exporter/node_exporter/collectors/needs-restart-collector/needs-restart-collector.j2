@@ -1,7 +1,10 @@
 #!/bin/bash -e
+
+start=$(date +%s.%N)
+
 services=$(
     (
-      needs-restart -b {% for p in exclude_paths %} -i {{ p|quote }}{% endfor %} {% if exclude_services %} | egrep -v {{ "|".join(exclude_services)|quote }} {% endif %} || true
+      needs-restart -b {% for p in exclude_paths %} -i {{ p|quote }}{% endfor %} {% if exclude_services %} | grep -E -v {{ "|".join(exclude_services)|quote }} {% endif %} || true
       needs-restart -b {% for p in exclude_paths %} -i {{ p|quote }}{% endfor %} | grep ^init.scope$ || true
     )
 )
@@ -14,7 +17,12 @@ for service in $services ; do
     DATA["$service"]=1
   fi
 done
+
+end=$(date +%s.%N)
+
 if [ "$move" == "1" ] ; then
+  echo "needs_restart_collector_start_timestamp $start" >> "$1".$$
+  echo "needs_restart_collector_end_timestamp $end" >> "$1".$$
   mv -f "$1".$$ "$1"
 else
   rm -f "$1"

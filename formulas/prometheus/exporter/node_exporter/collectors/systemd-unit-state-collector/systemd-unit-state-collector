@@ -1,5 +1,9 @@
 #!/usr/bin/python3
 
+import time
+
+start = time.time()
+
 import contextlib
 import os
 import sys
@@ -77,4 +81,7 @@ with atomic_outputter(sys.argv[1]) as out:
         else:
             unitflush(unit, flushed)
             flushed = True
+    end = time.time()
+    out.write("systemd_unit_state_collector_start_timestamp %s" % start)
+    out.write("systemd_unit_state_collector_end_timestamp %s" % end)
     unitflush(unit, flushed)
