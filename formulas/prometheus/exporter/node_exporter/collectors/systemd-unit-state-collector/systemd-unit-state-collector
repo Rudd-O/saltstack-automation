@@ -82,7 +82,7 @@ with atomic_outputter(sys.argv[1]) as out:
             unitflush(unit, flushed)
             flushed = True
     end = time.time()
-    if flushed = True:
+    if flushed:
         out.write("systemd_unit_state_collector_start_time_seconds %s\n" % start)
         out.write("systemd_unit_state_collector_end_time_seconds %s\n" % end)
     unitflush(unit, flushed)
