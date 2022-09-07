@@ -33,6 +33,7 @@ def physical():
 
 
 def updateable():
+    # This is always true for physical machines.
     return grains('qubes:updateable', False)
 
 
