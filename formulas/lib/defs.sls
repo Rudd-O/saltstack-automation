@@ -96,7 +96,7 @@ def PillarConfigWithDefaults(pillar_key, defaults, merge_lists=False):
 
 def ShowConfig(pillar_config):
     pillar_config = as_plain_dict(pillar_config)
-    return Test.nop("Configuration is:\n%s" % yaml.safe_dump(pillar_config))
+    return Test.nop("Configuration is:\n%s" % yaml.dump(pillar_config))
 
 
 def SystemUser(id_, shell=None, **kwargs):
