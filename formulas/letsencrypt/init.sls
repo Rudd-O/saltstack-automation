@@ -12,11 +12,12 @@ from salt://lib/letsencrypt.sls import certbot_webroot, certbot_live, certificat
 include("nginx")
 
 if fully_persistent_or_physical():
-    Pkg.installed("ca-certificates", require_in=[Pkg("certbot")]),
+    Pkg.installed("ca-certificates", require_in=[Pkg("certbot")])
+    pk = Pkg.installed("policycoreutils").requisite
     with Pkg.installed("certbot"):
         Qubes.enable_dom0_managed_service("certbot-renew", enable=False)
         Service.enabled("certbot-renew.timer")
-    deps = [Qubes("certbot-renew"), Service("certbot-renew.timer")]
+    deps = [Qubes("certbot-renew"), Service("certbot-renew.timer"), pk]
 else:
     deps = []
 
@@ -58,7 +59,7 @@ if not template():
             if fake_for(host):
                 if not (salt.file.file_exists(cert) and salt.file.file_exists(key)): # FIXME this could be replaced by cmd.run with creates=
                     C = Cmd.run
-                    cmd = 'openssl req -x509 -out /tmp/%(host)s.crt -keyout /tmp/%(host)s.key -newkey rsa:2048 -nodes -sha256 -subj "/CN=%(host)s" -extensions EXT -config <( printf "[dn]\nCN=%(host)s\n[req]\ndistinguished_name = dn\n[EXT]\nsubjectAltName=DNS:%(host)s\nkeyUsage=digitalSignature\nextendedKeyUsage=serverAuth") && mkdir -p $(dirname %(cert)s) && mv /tmp/%(host)s.key %(key)s && mv /tmp/%(host)s.crt %(cert)s'
+                    cmd = 'openssl req -x509 -out /tmp/%(host)s.crt -keyout /tmp/%(host)s.key -newkey rsa:2048 -nodes -sha256 -subj "/CN=%(host)s" -extensions EXT -config <( printf "[dn]\nCN=%(host)s\n[req]\ndistinguished_name = dn\n[EXT]\nsubjectAltName=DNS:%(host)s\nkeyUsage=digitalSignature\nextendedKeyUsage=serverAuth") && mkdir -p $(dirname %(cert)s) && mv /tmp/%(host)s.key %(key)s && mv /tmp/%(host)s.crt %(cert)s && restorecon $(dirname %(cert)s) %(cert)s %(key)s'
                     cmd = cmd % locals()
                 else:
                     C = Cmd.wait
