@@ -12,6 +12,7 @@ if fully_persistent_or_physical():
 LimitNOFILE=1048576
 LimitNOFILESoft=1048576
 """,
+            makedirs=True,
         ).requisite
     daemonreload = Cmd.run(
         "Reload NginX service file",

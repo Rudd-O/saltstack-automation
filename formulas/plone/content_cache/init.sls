@@ -53,6 +53,7 @@ reload varnish:
       [Service]
       LimitNOFILE=1048576
       LimitNOFILESoft=1048576
+  - makedirs: True
   - watch_in:
     - service: varnish
   - onchanges_in:
