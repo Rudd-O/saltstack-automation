@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import glob
 import os
 import pprint
 import subprocess
@@ -24,6 +25,11 @@ def qubes():
         except (subprocess.CalledProcessError, FileNotFoundError):
             # dom0 or physical machine -- updateable
             grains['updateable'] = True
+    if os.path.isdir("/run/qubes-service"):
+        grains["services"] = {}
+        for g in glob.glob("/run/qubes-service/*"):
+            n = os.path.basename(g)
+            grains["services"][n] = True
     return {'qubes': grains}
 
 

@@ -7,7 +7,10 @@ try:
     from shlex import quote as mquote
 except ImportError:
     from pipes import quote as mquote
-from six import string_types
+try:
+    from six import string_types
+except ImportError:
+    string_types = [str]
 
 
 def quote(s):
