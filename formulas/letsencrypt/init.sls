@@ -24,6 +24,7 @@ else:
 if not template():
     context = pillar("letsencrypt", {})
     default_renewal_email = context.get("renewal_email")
+    at_least_one_is_not_fake = False
 
     if "hosts" not in context or not context["hosts"]:
 
@@ -65,6 +66,7 @@ if not template():
                     C = Cmd.wait
                     cmd = "echo Certificates are already generated"
             else:
+                at_least_one_is_not_fake = True
                 renewal_email = data.get("renewal_email", default_renewal_email)
                 if not renewal_email:
                     raise KeyError("a renewal_email is needed by default in letsencrypt pillar or for the host")
@@ -88,11 +90,19 @@ if not template():
                 require=[Service("nginx running in HTTP-only mode")] + deps,
                 watch_in=[Service("nginx")],
                 require_in=[Test("all certificates generated")],
+                onchanges_in=[Cmd("certbot timer running")] if at_least_one_is_not_fake else [],
                 creates=cert,
             )
 
+    Cmd.run(
+        "certbot timer running",
+        name="systemctl start --no-block certbot-renew.timer",
+        onchanges=[],
+    )
+
     Test.nop(
         "all certificates generated",
+        require=[Cmd("certbot timer running")],
         require_in=[Service("nginx")],
     )
 

@@ -91,7 +91,6 @@ if not template():
         extip = salt.cmd.run(context.get("get_external_ip_command"), raise_err=True, rstrip=True)
         if hasattr(extip, "items"):
             # Uh oh the command did not succeed.
-            assert 0, type
             assert 0, "The get_external_ip_command failed to run: %s %s" % (extip, type(extip))
         if not extip:
             # Uh oh the command returned empty.

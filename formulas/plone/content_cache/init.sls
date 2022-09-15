@@ -1,11 +1,42 @@
 {% set context = salt['pillar.get'](sls.replace(".", ":"), {}) %}
-{% if context.get("listen_addr") or context.get("opts") %}
-{%   set opts = context.opts | default("-s memory=malloc,256m") %}
+
+{% if context.get("stevedores") %}
+{%   set stevedores = [] %}
+{%   for s, v in context.get("stevedores").items() %}
+{%     set x = "-s " + s + "=" + v["type"] %}
+{%     if v.get("path") %}
+{%        set x = x + "," + v["path"] %}
+{%     endif %}
+{%     if v.get("size") %}
+{%        set x = x + "," + v["size"] %}
+{%     endif %}
+{%     do stevedores.append(x) %}
+{%   endfor %}
+{%   set stevedores = " ".join(stevedores) %}
+{% else %}
+{%   set stevedores = "" %}
+{% endif %}
+
+{% if context.get("listen_addr") or context.get("opts") or stevedores %}
+{%   if context.get("opts") %}
+{%     set opts = context.opts + (stevedores | default("-s memory=default,256m")) %}
+{%   else %}
+{%     set opts = stevedores %}
+{%   endif %}
 {%   set listen_addr = context.listen_addr | default(":6081") %}
 {% else %}
 {%   set opts = None %}
 {%   set listen_addr = None %}
 {% endif %}
+
+{#
+Debug:
+  test.nop:
+  - name: |
+      {{ stevedores | json }}
+      {{ opts | json }}
+      {{ listen_addr | json }}
+#}
 
 include:
 - .set_backend
@@ -82,6 +113,7 @@ reload varnish:
   - template: jinja
   - context:
       purgekey: {{ context.get("purgekey", "") | json }}
+      stevedores: {{ context.get("stevedores", {}) | json }}
   - exclude_pat:
     - 50-backends.vcl
   - require:

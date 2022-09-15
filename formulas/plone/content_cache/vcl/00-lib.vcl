@@ -6,7 +6,7 @@ sub sanitize_plone_cookies {
         # If the user is logged in, we let Plone-specific authorized user cookies through.
         set req.http.Temp-Cookie = ";" + req.http.Cookie;
         set req.http.Temp-Cookie = regsuball(req.http.Cookie, "; +", ";");
-        set req.http.Temp-Cookie = regsuball(req.http.Temp-Cookie, ";(statusmessages|__cp|__ac(_name|_password|_persistent|)|_ZopeId|ZopeId|_tree-s|_fc.*|DF_filter|DF_expert)=", "; \1=");
+        set req.http.Temp-Cookie = regsuball(req.http.Temp-Cookie, ";(statusmessages|__cp|__ac(_name|_password|_persistent|)|_ZopeId|ZopeId|_tree-s|plone-toolbar|_fc.*|DF_filter|DF_expert)=", "; \1=");
         set req.http.Temp-Cookie = regsuball(req.http.Temp-Cookie, ";[^ ][^;]*", "");
         set req.http.Temp-Cookie = regsuball(req.http.Temp-Cookie, "^[; ]+|[; ]+$", "");
 
@@ -18,18 +18,5 @@ sub sanitize_plone_cookies {
         unset req.http.Temp-Cookie;
     } else {
         unset req.http.Cookie;
-    }
-}
-
-sub support_websockets_vcl_recv {
-    if (req.http.Upgrade ~ "(?i)websocket") {
-        return (pipe);
-    }
-}
-
-sub support_websockets_vcl_pipe {
-    if (req.http.Upgrade) {
-        set bereq.http.Upgrade = req.http.Upgrade;
-        set bereq.http.Connection = req.http.Connection;
     }
 }

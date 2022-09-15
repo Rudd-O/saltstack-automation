@@ -9,6 +9,9 @@
         add_header Strict-Transport-Security "max-age=63072000; preload" always;
 {%-     endif %}
 
+        add_header X-Frame-Options "sameorigin";
+        add_header Content-Type-Options "nosniff";
+
 {%-     for port in ports %}
         listen {{ port }} ssl http2;
         listen [::]:{{ port }} ssl http2;

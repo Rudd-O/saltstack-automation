@@ -45,9 +45,9 @@ plone:
       master:
         image: "plone:5.2.7"
     director:
-      staging.example.org:
-        deployment: master
-        site: Plone
+    - host_regex: staging.example.org
+      deployment: master
+      site: Plone
 ```
 
 These settings would:
@@ -87,15 +87,23 @@ The first deployment listed will always be the default deployment.
 
 ### `plone:container:director` pillar
 
-This pillar contains a dictionary of `{hostname -> settings}` where
-the supported settings are:
+This pillar contains a list of `[host_regex, url_regex, site, folder]`
+where the supported settings are:
 
+* `host_regex`: defines which host names match (default all)
+* `url_regex`: defines which URL path pattern matches (default all)
+* `folder`: if a subfolder of the site should be served
 * `deployment`: defines a deployment from the list of deployments
   that the host name will use.  If unspecified, it defaults to the
   first deployment in the deployments list.
 * `site`: defines a Plone site (URL fragment from the root of the
   Plone container) to serve at this hostname.  If unspecified, it
   will simply serve the root of the Plone container.
+
+If the client's URL or host do not match anything (because there
+is no matching director entry), no Plone backend will be selected
+and there will be no response to the client unless another backend
+is defaulted to.
 
 ### `plone:content_cache` pillar
 
@@ -111,8 +119,8 @@ This pillar may contain three different key/pair values:
 ## Cache purging
 
 If a `purgekey` is set (see above), then clients that call URL
-`https://yourfrontendhostname/purgekey=<the purge key>/abc` with
-method `PURGE` will get `/abc` purged from the cache.
+`https://site.com/purgekey=<the purge key>/abc` with method `PURGE`
+will get `https://site.com/abc` purged from the cache.
 
 The general formula for the purge URL is:
 

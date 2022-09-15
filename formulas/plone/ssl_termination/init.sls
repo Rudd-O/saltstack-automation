@@ -26,10 +26,12 @@ if not template():
 
         for server_name in server_names:
             if hasattr(server_name, "items"):
-                canonical = server_name["canonical"]
+                canonical = server_name.get("canonical", None)
+                hsts = server_name.get("hsts", context.get("hsts", True))
                 server_name = server_name["name"]
             else:
                 canonical = None
+                hsts = context.get("hsts", True)
 
             cert = fullchain_path(server_name)
             key = privkey_path(server_name)
@@ -40,7 +42,8 @@ if not template():
 """.strip()
             proxy_pass_config = f"""
                             # Varnish configuration.
-                            proxy_buffering off;
+                            proxy_buffers 16 4k;
+                            proxy_buffer_size 4k;
                             proxy_request_buffering off;
                             # End Varnish configurations.
 
@@ -68,7 +71,7 @@ if not template():
                     "max_upload_size": context.get("max_upload_size", "1000M"),
                     "ssl_certificate": cert,
                     "ssl_certificate_key": key,
-                    "hsts": context.get("hsts", True),
+                    "hsts": hsts,
                     "server_config": """
                         location / {
                             %(location_config)s

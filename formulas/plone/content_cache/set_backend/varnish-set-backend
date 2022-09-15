@@ -50,6 +50,17 @@ else:
     backend, address = args[0:2]
     try:
         director = json.loads(args[2])
+        for d in config["director"]:
+            if "host_regex" not in d:
+                d["host_regex"] = ".*"
+            if "url_regex" not in d:
+                d["url_regex"] = ".+"
+            if "site" not in d:
+                d["site"] = None
+            if "folder" not in d:
+                d["folder"] = None
+            if "vh" in d:
+                d["vh"] = "/".join("vh_" + x for x in d["vh"].split("/"))
     except IndexError:
         director = None
 
@@ -59,17 +70,15 @@ if director is not None:
 
 
 def remove_directors_that_use_nonexistent_deployments():
-    for k, v in list(config["director"].items()):
-        if "deployment" not in v:
-            if config["backends"]:
-                v["deployment"] = list(config["backends"].keys())[0]
-        dep = v["deployment"]
-        if dep not in config["backends"]:
+    for n, v in enumerate(config["director"]):
+        dep = v.get("deployment", None)
+        if dep is not None and dep not in config["backends"]:
             print(
-                f"Warning: host {k} directs to undefined deployment {dep}",
+                f"Warning: director entry {n} directs to undefined deployment {dep}",
                 file=sys.stderr,
             )
-            del config["director"][k]
+            config["director"][n] = None
+    config["director"] = [x for x in config["director"] if x is not None]
 
 
 if delete:
@@ -89,17 +98,10 @@ else:
     }
     remove_directors_that_use_nonexistent_deployments()
 
-    try:
-        site = json.loads(args[2])
-        if type(site) is str:
-            config["backends"][backend]["site"] = site
-            config["backends"][backend]["sites"] = {}
-        else:
-            config["backends"][backend]["site"] = ""
-            config["backends"][backend]["sites"] = site
-    except IndexError:
-        pass
-
+    for backend in config["backends"]:
+        for s in ["site", "sites"]:
+            if s in config["backends"][backend]:
+                del config["backends"][backend][s]
 
 if config["backends"]:
     config["default_backend"] = list(config["backends"])[0]
@@ -110,12 +112,6 @@ else:
 tpl = jinja2.Template(
     """vcl 4.1;
 
-{%- if not backends %}
-
-backend default none;
-
-{%- else %}
-
 {%-   for backend_name, backend in backends.items() %}
 backend plone_{{ backend_name }} {
    .host = "{{ backend.host }}";
@@ -125,48 +121,77 @@ backend plone_{{ backend_name }} {
 
 sub vcl_recv {
 
-    if (!req.http.Plone-Backend) {
-
-{%-   if default_backend %}
+    if (req.url ~ "^/@@metrics$") {
         set req.backend_hint = plone_{{ default_backend }};
         set req.http.Plone-Backend = "{{ default_backend }}";
-{%-   endif %}
+        return(pass);
+    }
 
 {%-   for backend_name in backends %}
-        if (req.url ~ "/deployments/{{ backend_name }}($|/)") {
-            set req.backend_hint = plone_{{ backend_name }};
-            set req.http.Plone-Backend = "{{ backend_name }}";
-            set req.url = regsub(req.url, "^/deployments/{{ backend_name }}", "/VirtualHostBase/" + req.http.X-Forwarded-Proto + "/" + req.http.Host + "/VirtualHostRoot/_vh_deployments/_vh_{{ backend_name }}");
-            return(pass);
+    if (req.url ~ "/deployments/{{ backend_name }}($|/)") {
+        if (!req.http.Authorization) {
+            set req.http.WWW-Authenticate = {"Basic realm="Zope""};
+            return (synth(801, "You need to authenticate"));
         }
+
+        set req.backend_hint = plone_{{ backend_name }};
+        set req.http.Plone-Backend = "{{ backend_name }}";
+        set req.url = regsub(req.url, "^/deployments/{{ backend_name }}", "/VirtualHostBase/" + req.http.X-Forwarded-Proto + "/" + req.http.Host + "/VirtualHostRoot/_vh_deployments/_vh_{{ backend_name }}");
+        return(pass);
+    }
 {%-   endfor %}
 
-{%-   for host, director_data in director.items() %}
+{%-   for director_data in director %}
 
-        if (req.http.Host == "{{ host }}") {
+    if (!req.http.Plone-Backend) {
 
-{%-       if director_data.site | default(None) %}
+        if (req.http.Host ~ "{{ director_data.host_regex }}" && req.url ~ "{{ director_data.url_regex }}") {
+
+{%-       if director_data.site %}
             set req.http.Site = "/{{ director_data.site }}";
 {%        else %}
             set req.http.Site = "";
 {%-       endif %}
 
-{%-       if director_data.deployment | default(None) %}
-            set req.backend_hint = plone_{{ director_data.deployment }};
-            set req.http.Plone-Backend = "{{ director_data.deployment }}";
+{%-       if director_data.folder %}
+            set req.http.Folder = "/{{ director_data.folder }}";
+{%        else %}
+            set req.http.Folder = "";
 {%-       endif %}
+
+{%-       if director_data.skip_folder_for | default(None) %}
+            if (req.url ~ "{{ director_data.skip_folder_for }}") {
+              set req.http.Folder = "";
+            }
+{%-       endif %}
+
+{%-       if director_data.vh | default(False) %}
+            set req.http.VH = "/{{ director_data.vh }}";
+{%        else %}
+            set req.http.VH = "";
+{%-       endif %}
+
+
+          set req.backend_hint = plone_{{ director_data.deployment | default(default_backend) }};
+          set req.http.Plone-Backend = "{{ director_data.deployment | default(default_backend) }}";
+          set req.url = regsub(req.url, "^", "/VirtualHostBase/" + req.http.X-Forwarded-Proto + "/" + req.http.Host + req.http.Site + req.http.Folder + "/VirtualHostRoot" + req.http.VH);
 
         }
 
-{%-   endfor %}
-
-        set req.url = regsub(req.url, "^", "/VirtualHostBase/" + req.http.X-Forwarded-Proto + "/" + req.http.Host + req.http.Site + "/VirtualHostRoot");
-
     }
+
+{%-   endfor %}
 
 }
 
-{% endif %}
+sub vcl_synth {
+    if (resp.status == 801) {
+        set resp.http.WWW-Authenticate = req.http.WWW-Authenticate;
+        set resp.status = 401;
+        return (deliver);
+    }
+}
+
 """
 )
 
