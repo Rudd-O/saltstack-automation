@@ -62,7 +62,7 @@ def reqs():
             Podman.allocate_subgid_range(
                 "%(user)s subgid" % locals(),
                 name=user,
-                howmany=1000,
+                howmany=65536,
                 require_in=[sysreq],
             )
             with User.present(
@@ -76,7 +76,7 @@ def reqs():
                 Podman.allocate_subuid_range(
                     "%(user)s subuid" % locals(),
                     name=user,
-                    howmany=1000,
+                    howmany=65536,
                     require_in=[sysreq],
                 )
 
@@ -125,6 +125,7 @@ def copy_over(source, destination, **kwargs):
         f"copy over {source} to {destination}",
         name="""set -e
 context=$(ls -Zd %(destination)s/filestorage | cut -f 1 -d ' ' || true)
+mkdir -p %(destination)s
 rsync -a --delete --inplace %(source)s/filestorage/ %(destination)s/filestorage/
 rm -rf %(destination)s/blobstorage
 cp -a --reflink=auto %(source)s/blobstorage %(destination)s/blobstorage
@@ -168,8 +169,9 @@ def deploy(i, n, data):
     blue_datadir = datadir + "-blue"
     options = [
         {"tls-verify": "false"},
-        {"subgidname": user},
-        {"subuidname": user},
+        {"user": "plone:plone"},
+        {"stop-signal": "SIGINT"},
+        {"stop-timeout": "30"},
     ]
     options_blue = options + [
         {"p": deployment_address_blue + ":8080"},
