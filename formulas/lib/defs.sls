@@ -171,6 +171,7 @@ def KnownHostForUser(id_, host, known_host_keys, **kwargs):
                     name=host,
                     user=id_,
                     enc=key_enc,
+                    key=key,
                     **kwargs,
                 )
     return before.requisite, after.requisite
