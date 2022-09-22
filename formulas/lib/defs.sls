@@ -109,6 +109,7 @@ def SystemUser(id_, shell=None, **kwargs):
             f"{id_} system user",
             system=True,
             name=id_,
+            gid=id_,
             createhome=True,
             shell=shell if shell else "/usr/sbin/nologin",
             home=f"/var/lib/{id_}",
@@ -136,17 +137,26 @@ def SSHKeyForUser(id_, key, key_name="id_rsa", key_path=".ssh", **kwargs):
 
 
 def SSHAccessToUser(id_, authorized_keys, **kwargs):
-    return SshAuth.present(
+    opts = ["no-agent-forwarding", "no-port-forwarding"]
+    if "options" in kwargs:
+        for opt in kwargs["options"]:
+            if opt not in opts:
+                opts.append(opt)
+        del kwargs["options"]
+    return SshAuth.manage(
         f"access to {id_}",
         user=id_,
-        options=["no-agent-forwarding", "no-port-forwarding"],
-        names=authorized_keys,
+        options=opts,
+        ssh_keys=authorized_keys,
         **kwargs,
     ).requisite
 
 
 def KnownHostForUser(id_, host, known_host_keys, **kwargs):
-    host = host.split("@")[-1].split(":")[0]
+    try:
+        host = host.split("@")[-1].split(":")[0]
+    except Exception:
+        assert 0, host
     before_n = f"Before keys for host {host} in user {id_}"
     after_n = f"After keys for host {host} in user {id_}"
     before = Test.nop(before_n)

@@ -23,6 +23,9 @@ perms = File.directory(
         Cmd("reload nginx"),
         SshAuth("access to mirrorer"),
     ],
+    dir_mode="0755",
+    file_mode="0644",
+    recurse=["user", "group", "mode"],
     **perms.dir,
 ).requisite
 

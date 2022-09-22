@@ -22,7 +22,16 @@ a = SSHAccessToUser(
     require=[u],
 )
 
-_, h = KnownHostForUser(
+ip = salt.misc.gethostbyname(context.mirror.host.split("@")[-1])
+
+_, h1 = KnownHostForUser(
+    "artifact-pusher",
+    ip,
+    context.mirror.known_host_keys,
+    require=[u],
+)
+
+_, h2 = KnownHostForUser(
     "artifact-pusher",
     context.mirror.host,
     context.mirror.known_host_keys,
@@ -45,5 +54,5 @@ root = File.directory(
 
 Test.nop(
     "RPM repo server deployed",
-    require=[root, k, h, a, p],
+    require=[root, k, h1, h2, a, p],
 )
