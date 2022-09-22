@@ -11,6 +11,9 @@ import posix_ipc
 import sys
 
 
+_NO_DEFAULT = object()
+
+
 def cmd_with_serialization_lock(cmd, **kwargs):
     with open(os.path.expanduser("~/.qvmpass.lock"), "w+") as x:
         x.write(str(os.getpid()))
@@ -84,7 +87,7 @@ def listdir(subdir=None, vm=None):
     return list(t.keys())
 
 
-def get(key, create=True, vm=None):
+def get(key, create=True, vm=None, default=_NO_DEFAULT):
     # FIXME: uses of get() are tainted by both create=True and the assumption
     # that this returns the very first line without a space at the end, this
     # must be corrected everywhere.
@@ -103,11 +106,13 @@ def get(key, create=True, vm=None):
     except subprocess.CalledProcessError as e:
         if e.returncode == 8:
             # FIXME proper error handling: https://github.com/saltstack/salt/issues/43187
+            if default != _NO_DEFAULT:
+                return default
             raise KeyError(key)
         raise
 
 
-def get_multiline(key, vm=None):
+def get_multiline(key, vm=None, default=_NO_DEFAULT):
     a = ["qvm-pass"]
     if vm is not None:
         a.append("-d")
@@ -121,6 +126,8 @@ def get_multiline(key, vm=None):
     except subprocess.CalledProcessError as e:
         if e.returncode == 8:
             # FIXME proper error handling: https://github.com/saltstack/salt/issues/43187
+            if default != _NO_DEFAULT:
+                return default
             raise KeyError(key)
         raise
 
