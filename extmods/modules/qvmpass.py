@@ -14,7 +14,7 @@ import sys
 _NO_DEFAULT = object()
 
 
-def cmd_with_serialization_lock(cmd, **kwargs):
+def _cmd_with_serialization_lock(cmd, **kwargs):
     with open(os.path.expanduser("~/.qvmpass.lock"), "w+") as x:
         x.write(str(os.getpid()))
         x.flush()
@@ -26,7 +26,9 @@ def cmd_with_serialization_lock(cmd, **kwargs):
             fcntl.flock(x, fcntl.LOCK_UN)
 
 
-def cmd_with_serialization(cmd, **kwargs):
+def _cmd_with_serialization(cmd, **kwargs):
+    return subprocess.check_output(cmd, **kwargs)
+    # the rest is currently disabled  FIXME
     with posix_ipc.Semaphore(
         name="/qvmpass.lock", flags=posix_ipc.O_CREAT, initial_value=6
     ):
@@ -40,7 +42,7 @@ def tree(vm=None):
         a.append(vm)
     e = dict(os.environ.items())
     e["LC_ALL"] = "en_US.utf-8"
-    lines = cmd_with_serialization(a, env=e, bufsize=0)
+    lines = _cmd_with_serialization(a, env=e, bufsize=0)
     lines = lines.decode("utf-8").splitlines()
     currdepth = 0
     items = {}
@@ -102,7 +104,7 @@ def get(key, create=True, vm=None, default=_NO_DEFAULT):
     a.append("--")
     a.append(key)
     try:
-        return cmd_with_serialization(a, universal_newlines=True, bufsize=0)[:-1]
+        return _cmd_with_serialization(a, universal_newlines=True, bufsize=0)[:-1]
     except subprocess.CalledProcessError as e:
         if e.returncode == 8:
             # FIXME proper error handling: https://github.com/saltstack/salt/issues/43187
@@ -122,7 +124,7 @@ def get_multiline(key, vm=None, default=_NO_DEFAULT):
     a.append("--")
     a.append(key)
     try:
-        return cmd_with_serialization(["qvm-pass", key], universal_newlines=True, bufsize=0)
+        return _cmd_with_serialization(["qvm-pass", key], universal_newlines=True, bufsize=0)
     except subprocess.CalledProcessError as e:
         if e.returncode == 8:
             # FIXME proper error handling: https://github.com/saltstack/salt/issues/43187
