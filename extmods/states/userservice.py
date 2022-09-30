@@ -80,3 +80,35 @@ def running(name, user, enable=False):
     }
     return ret
     
+
+def dead(name, user):
+    startret = dict(result=False, changes={}, name=name, comment="Fallthrough error 2")
+    r = _runas(['systemctl', '--machine=%s@.host' % user, '--user', 'is-active', '--', name], None)
+    if r == "active":
+        if __opts__["test"]:
+            startret["comment"] = "Would have stopped unit %s." % name
+            startret["changes"]["dead"] = name
+            startret["result"] = None
+        else:
+            r = _runas(['systemctl', '--machine=%s@.host' % user, '--user', 'stop', '--', name], None, use_subprocess=True)
+            if r.returncode == 0:
+                startret["comment"] = "Stopped unit %s." % name
+                startret["changes"]["dead"] = name
+                startret["result"] = True
+            else:
+                startret["comment"] = r.stderr.strip()
+    else:
+        startret["comment"] = "Unit %s is already stopped." % name
+        startret["result"] = True
+
+    ret = {
+        "result": False if (
+            startret["result"] is False
+        ) else None if (
+            startret["result"] is None
+        ) else True,
+        "comment": startret["comment"],
+        "name": name,
+        "changes": {**startret["changes"]},
+    }
+    return ret
