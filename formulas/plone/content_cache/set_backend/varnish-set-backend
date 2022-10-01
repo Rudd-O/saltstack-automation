@@ -114,8 +114,13 @@ tpl = jinja2.Template(
 
 {%-   for backend_name, backend in backends.items() %}
 backend plone_{{ backend_name }} {
-   .host = "{{ backend.host }}";
-   .port = "{{ backend.port }}";
+    .host = "{{ backend.host }}";
+    .port = "{{ backend.port }}";
+    .probe = {
+        .url = "/";
+        .timeout = 3s;
+        .interval = 5s;
+    }
 }
 {%-   endfor %}
 
