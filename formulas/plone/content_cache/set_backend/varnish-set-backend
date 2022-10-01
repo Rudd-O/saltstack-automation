@@ -116,6 +116,7 @@ tpl = jinja2.Template(
 backend plone_{{ backend_name }} {
     .host = "{{ backend.host }}";
     .port = "{{ backend.port }}";
+    .max_connections = 90;
     .probe = {
         .url = "/";
         .timeout = 3s;

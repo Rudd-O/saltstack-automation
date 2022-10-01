@@ -9,10 +9,3 @@ sub vcl_recv {
         call plone_vcl_recv;
     }
 }
-
-sub vcl_backend_fetch {
-    if (bereq.http.Plone-Backend) {
-        /* Disable connection reuse. */
-        set bereq.http.Connection = "close";
-    }
-}

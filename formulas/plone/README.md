@@ -116,6 +116,9 @@ This pillar may contain three different key/pair values:
   but only to clients that possess the string and pass it in the
   URL.
 
+Plone backends are fixed to a maximum of 90 simultaneous connections
+from the content cache, since beyond that `waitress` stops serving.
+
 ## Cache purging
 
 If a `purgekey` is set (see above), then clients that call URL
