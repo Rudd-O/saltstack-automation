@@ -16,15 +16,18 @@ backends_file = "/etc/varnish/plone/50-backends.vcl"
 backend_config = "/etc/varnish/plone-backend-config.json"
 
 
-def test(address):
-    strat = Retry(total=8, backoff_factor=0.1)
-    adapter = HTTPAdapter(max_retries=strat)
-    sesh = requests.Session()
-    sesh.mount("http://", adapter)
-    sesh.hooks[
-        "response"
-    ] = lambda response, *args, **kwargs: response.raise_for_status()
-    response = sesh.get("http://%s/" % address, timeout=5)
+def test(addresses):
+    if isinstance(addresses, str):
+        addresses = [addresses]
+    for address in addresses:
+        strat = Retry(total=10, backoff_factor=0.1)
+        adapter = HTTPAdapter(max_retries=strat)
+        sesh = requests.Session()
+        sesh.mount("http://", adapter)
+        sesh.hooks[
+            "response"
+        ] = lambda response, *args, **kwargs: response.raise_for_status()
+        response = sesh.get("http://%s/" % address, timeout=5)
 
 
 try:
@@ -47,7 +50,8 @@ if args[0] == "--delete":
     director = None
 else:
     delete = False
-    backend, address = args[0:2]
+    backend, addresses = args[0:2]
+    addresses = json.loads(addresses)
     try:
         director = json.loads(args[2])
         for d in config["director"]:
@@ -87,15 +91,39 @@ if delete:
     remove_directors_that_use_nonexistent_deployments()
 
 else:
-    host = address.split(":")[0]
-    if not host or host == "0.0.0.0":
-        host = "127.0.0.1"
-    port = address.split(":")[1]
+    if isinstance(addresses, str):
+        host = addresses.split(":")[0]
+        if not host or host == "0.0.0.0":
+            host = "127.0.0.1"
+        port = addresses.split(":")[1]
 
-    config["backends"][backend] = {
-        "host": host,
-        "port": port,
-    }
+        config["backends"][backend] = {
+            "targets": [{
+                "host": host,
+                "port": port,
+            }],
+        }
+    else:
+        config["backends"][backend] = {
+            "targets": [],
+        }
+        for address in addresses:
+            host = address.split(":")[0]
+            if not host or host == "0.0.0.0":
+                host = "127.0.0.1"
+            port = address.split(":")[1]
+
+            config["backends"][backend]["targets"].append({
+                "host": host,
+                "port": port,
+            })
+    # Migrate existing data.
+    for v in config["backends"].values():
+        if "targets" not in v and "host" in v and "port" in v:
+            v["targets"] = [{"host": v["host"], "port": v["port"]}]
+            del v["host"]
+            del v["port"]
+
     remove_directors_that_use_nonexistent_deployments()
 
     for backend in config["backends"]:
@@ -112,23 +140,37 @@ else:
 tpl = jinja2.Template(
     """vcl 4.1;
 
+import directors;
+
 {%-   for backend_name, backend in backends.items() %}
-backend plone_{{ backend_name }} {
-    .host = "{{ backend.host }}";
-    .port = "{{ backend.port }}";
+{%-     for target in backend.targets %}
+backend plone_{{ backend_name }}_{{ loop.index }} {
+    .host = "{{ target.host }}";
+    .port = "{{ target.port }}";
     .max_connections = 90;
+    .connect_timeout = 10s;
     .probe = {
         .url = "/";
-        .timeout = 3s;
-        .interval = 5s;
+        .timeout = 9s;
+        .interval = 10s;
     }
 }
+{%-     endfor %}
 {%-   endfor %}
+
+sub vcl_init {
+{%-   for backend_name, backend in backends.items() %}
+    new director_plone_{{ backend_name }} = directors.round_robin();
+{%-     for target in backend.targets %}
+    director_plone_{{ backend_name }}.add_backend(plone_{{ backend_name }}_{{ loop.index }});
+{%-     endfor %}
+{%-   endfor %}
+}
 
 sub vcl_recv {
 
     if (req.url ~ "^/@@metrics$") {
-        set req.backend_hint = plone_{{ default_backend }};
+        set req.backend_hint = director_plone_{{ default_backend }}.backend();
         set req.http.Plone-Backend = "{{ default_backend }}";
         return(pass);
     }
@@ -140,7 +182,7 @@ sub vcl_recv {
             return (synth(801, "You need to authenticate"));
         }
 
-        set req.backend_hint = plone_{{ backend_name }};
+        set req.backend_hint = director_plone_{{ backend_name }}.backend();
         set req.http.Plone-Backend = "{{ backend_name }}";
         set req.url = regsub(req.url, "^/deployments/{{ backend_name }}", "/VirtualHostBase/" + req.http.X-Forwarded-Proto + "/" + req.http.Host + "/VirtualHostRoot/_vh_deployments/_vh_{{ backend_name }}");
         return(pass);
@@ -178,7 +220,7 @@ sub vcl_recv {
 {%-       endif %}
 
 
-          set req.backend_hint = plone_{{ director_data.deployment | default(default_backend) }};
+          set req.backend_hint = director_plone_{{ director_data.deployment | default(default_backend) }}.backend();
           set req.http.Plone-Backend = "{{ director_data.deployment | default(default_backend) }}";
           set req.url = regsub(req.url, "^", "/VirtualHostBase/" + req.http.X-Forwarded-Proto + "/" + req.http.Host + req.http.Site + req.http.Folder + "/VirtualHostRoot" + req.http.VH);
 
@@ -230,8 +272,8 @@ if rendered != existing:
     print("\n".join(diff), file=sys.stderr)
 
     if not delete:
-        print("Ensuring new address responds with HTTP 200...", file=sys.stderr)
-        test(address)
+        print("Ensuring new addresses %s responds with HTTP 200..." % addresses, file=sys.stderr)
+        test(addresses)
 
     with open(backends_file, "w") as b:
         b.write(rendered)

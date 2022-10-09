@@ -16,12 +16,16 @@ if pillar("build:repo:client", ""):
 
 context = pillar(sls.replace(".", ":"), {})
 data_basedir = context.get("directories", {}).get("datadir", "/srv/plone")
+default_image = "docker.io/plone/plone-backend:6.0.0b2"
+default_zeo_image = "docker.io/plone/plone-zeo:5.3.0"
 default_base_port = context.get("base_port", 8080)
-default_listen_addr = context.get("listen_addr", "127.0.5.1")
+default_green_listen_addr_prefix = context.get("green_listen_addr_prefix", "127.0.6.")
+default_blue_listen_addr_prefix = context.get("blue_listen_addr_prefix", "127.0.6.")
 deployments = context["deployments"]
 limit_to = pillar("limit_to", list(deployments.keys()))
 user = context["users"]["process"]
 director = context.get("director", {})
+default_backend_processes = context.get("backend_processes", 2)
 
 
 def reqs():
@@ -112,7 +116,7 @@ def delete(n, data):
     ).requisite
     for color in "blue green".split():
         nc = f"plone-{n}-{color}"
-        with Podman.absent(
+        with Podman.pod_absent(
             f"remove {nc}",
             name=nc,
             require=[lbnn],
@@ -129,6 +133,8 @@ mkdir -p %(destination)s
 rsync -a --delete --inplace %(source)s/filestorage/ %(destination)s/filestorage/
 rm -rf %(destination)s/blobstorage
 cp -a --reflink=auto %(source)s/blobstorage %(destination)s/blobstorage
+chown -R root.root %(destination)s
+chmod 755 %(destination)s %(destination)s/blobstorage %(destination)s/filestorage
 if [ "$context" != "" ] ; then
     chcon -R "$context" %(destination)s/blobstorage %(destination)s/filestorage
 fi
@@ -141,16 +147,16 @@ fi
     )
 
 
-def failover(n, deployment_address, director, **kwargs):
+def failover(n, deployment_addresses, director, **kwargs):
     kwargs["require"] = kwargs.get("require", []) + [
         File("/usr/local/bin/varnish-set-backend")
     ]
     return Cmd.run(
-        f"fail over {n} to {deployment_address}",
+        f"fail over {n} to {','.join(deployment_addresses)}",
         name="/usr/local/bin/varnish-set-backend %s %s %s"
         % (
             quote(n),
-            quote(deployment_address),
+            quote(json.dumps(deployment_addresses)),
             quote(json.dumps(director)),
         ),
         stateful=True,
@@ -158,46 +164,94 @@ def failover(n, deployment_address, director, **kwargs):
     )
 
 
-def deploy(i, n, data):
+def deploy(i, n, processes, data):
     datadir = join(data_basedir, n)
-    listen_addr = data.get("listen_addr", default_listen_addr)
-    base_port = data.get("base_port", default_base_port)
-    port = base_port + (i * 2)
-    deployment_address_green = "%s:%d" % (listen_addr, port)
-    deployment_address_blue = "%s:%d" % (listen_addr, port + 1)
-    green_datadir = datadir + "-green"
-    blue_datadir = datadir + "-blue"
-    options = [
-        {"tls-verify": "false"},
-        {"user": "plone:plone"},
-        {"stop-signal": "SIGINT"},
-        {"stop-timeout": "30"},
-    ]
-    options_blue = options + [
-        {"p": deployment_address_blue + ":8080"},
-        {"v": join(blue_datadir, "filestorage") + ":/data/filestorage:rw,Z,shared,U"},
-        {"v": join(blue_datadir, "blobstorage") + ":/data/blobstorage:rw,Z,shared,U"},
-    ]
-    options_green = options + [
-        {"p": deployment_address_green + ":8080"},
-        {"v": join(green_datadir, "filestorage") + ":/data/filestorage:rw,Z,shared,U"},
-        {"v": join(green_datadir, "blobstorage") + ":/data/blobstorage:rw,Z,shared,U"},
-    ]
+    blue_listen_addr_prefix = data.get("blue_listen_addr_prefix", default_blue_listen_addr_prefix)
+    if not blue_listen_addr_prefix.endswith("."):
+        blue_listen_addr_prefix += "."
+    green_listen_addr_prefix = data.get("green_listen_addr_prefix", default_green_listen_addr_prefix)
+    if not green_listen_addr_prefix.endswith("."):
+        green_listen_addr_prefix += "."
+
+    port = data.get("base_port", default_base_port)
+
+    def make_containers(nc, datadir, listen_addr, procs):
+        pod_options = [
+            {"exit-policy": "stop"},
+            {"subuidname": "plone"},
+            {"subgidname": "plone"},
+            {"infra-name": f"{nc}-infra"},
+        ]
+        containers = [
+            [
+                {"tls-verify": "false"},
+                {"name": f"{nc}-zeo"},
+                {"image": deployment_data.get("zeo_image", default_zeo_image)},
+                {"stop-signal": "SIGTERM"},
+                {"e": "ZEO_ADDRESS=localhost:8100"},
+                {"e": "ZEO_SHARED_BLOB_DIR=true"},
+                {"v": datadir + ":/data:rw,z,shared,U"},
+                {"requires": f"{nc}-infra"},
+            ]
+        ]
+        addresses = []
+        for nn in range(procs):
+            lp = port + nn
+            containers.append(
+                [
+                    {"stop-timeout": "30"},
+                    {"tls-verify": "false"},
+                    {"name": f"{nc}-backend-{nn}"},
+                    {"image": deployment_data.get("image", default_image)},
+                    {"stop-signal": "SIGINT"},
+                    {"e": "ZEO_ADDRESS=localhost:8100"},
+                    {"e": "ZEO_SHARED_BLOB_DIR=true"},
+                    {"e": f"LISTEN_PORT={lp}"},
+                    {"v": join(datadir, "blobstorage") + ":/data/blobstorage:rw,z,shared,U"},
+                    {"health-cmd": f"wget -O/dev/null http://127.0.0.1:{lp}"},
+                    {"health-interval": "15s"},
+                    {"health-retries": "3"},
+                    {"health-start-period": "2s"},
+                    {"health-timeout": "60s"},
+                ],
+            )
+            if nn == 0:
+                # Allow the first container to initialize the ZODB.
+                containers[-1].extend([
+                    {"requires": f"{nc}-zeo"},
+                ])
+            else:
+                # Make the next container wait until the last one is healthy.
+                containers[-1].extend([
+                    {"requires": f"{nc}-backend-{nn - 1}"},
+                ])
+
+            pod_options.append({"p": f"{listen_addr}:{lp}:{lp}"})
+            addresses.append(f"{listen_addr}:{lp}")
+        return pod_options, containers, addresses
 
     nc_blue = f"plone-{n}-blue"
     nc_green = f"plone-{n}-green"
+    blue_datadir = datadir + "-blue"
+    green_datadir = datadir + "-green"
+    blue_listen_addr = blue_listen_addr_prefix + str(i * 2 + 1)
+    green_listen_addr = green_listen_addr_prefix + str(i * 2 + 2)
+
+    green_pod_options, green_pod_containers, green_addresses = make_containers(nc_green, green_datadir, green_listen_addr, processes)
+    blue_pod_options, blue_pod_containers, blue_addresses = make_containers(nc_blue, blue_datadir, blue_listen_addr, processes)
+    # Keep the line above this comment in sync with the almost-identical line below.
 
     if salt.file.directory_exists(green_datadir):
 
-        check_green = Podman.present(
+        check_green = Podman.pod_running(
             f"check {nc_green}",
             name=nc_green,
-            image=deployment_data["image"],
+            options=green_pod_options,
+            containers=green_pod_containers,
             dryrun=True,
-            options=options_green,
             require=[sysreq],
         ).requisite
-        blue_dead = Podman.dead(
+        blue_dead = Podman.pod_dead(
             f"stop {nc_blue}",
             name=nc_blue,
             onchanges=[check_green],
@@ -251,23 +305,34 @@ def deploy(i, n, data):
                 )
             co.append(File(f"{blue_datadir}{x}"))
 
-    blue_started = Podman.present(
+        # This will be initialized for the first time as blue.  We must reduce the
+        # app container processes for the blue instance to 1, in order to afford
+        # the correct initialization procedure for the database (the frontend is
+        # what initializes the database, and concurrent initialization results in
+        # conflict errors which abort startup).
+        blue_pod_options, blue_pod_containers, blue_addresses = make_containers(nc_blue, blue_datadir, blue_listen_addr, 1)
+
+    # TODO: pod_running should optionally wait until all health checks passed.
+    # Basically podman pod inspect, then get names of containers, then
+    # pause until all containers with health checks are in state healthy.
+
+    blue_started = Podman.pod_running(
         f"start {nc_blue}",
         name=nc_blue,
-        image=deployment_data["image"],
-        options=options_blue,
+        options=blue_pod_options,
+        containers=blue_pod_containers,
         onchanges=co,
     ).requisite
     failover_to_blue = failover(
         n,
-        deployment_address_blue,
+        blue_addresses,
         director=director,
         onchanges=[blue_started],
     ).requisite
 
     # We have failed over to blue.
 
-    green_dead = Podman.dead(
+    green_dead = Podman.pod_dead(
         f"stop {nc_green}",
         name=nc_green,
         require=[failover_to_blue],
@@ -288,25 +353,25 @@ def deploy(i, n, data):
         ).requisite
     ]
 
-    green_started = Podman.present(
+    green_started = Podman.pod_running(
         f"start {nc_green}",
         name=nc_green,
-        image=deployment_data["image"],
+        options=green_pod_options,
+        containers=green_pod_containers,
         enable=True,
-        options=options_green,
         require=co,
     ).requisite
 
     failover_to_green = failover(
         n,
-        deployment_address_green,
+        green_addresses,
         director=director,
         require=[green_started],
     ).requisite
 
     # We have failed over to green.
 
-    Podman.dead(f"stop {nc_blue} again", name=nc_blue, require=[failover_to_green])
+    Podman.pod_dead(f"stop {nc_blue} again", name=nc_blue, require=[failover_to_green])
 
 
 # FIXME FOR QUBES SUPPORT
@@ -324,30 +389,12 @@ for i, (deployment_name, deployment_data) in enumerate(deployments.items()):
     if deployment_data.get("delete"):
         delete(deployment_name, deployment_data)
     else:
-        deploy(i, deployment_name, deployment_data)
+        procs = deployment_data.get("backend_processes", default_backend_processes)
+        deploy(i, deployment_name, procs, deployment_data)
 
 
 """
 {#
-
-test {{ deployment_name }}:
-{%     if deployment_data.get("unit_test_name") %}
-  cmd.run:
-  - name: |
-      set -e
-      cd {{ salt.text.quote(deployment_target_dir) }}
-      bin/test -m {{ salt.text.quote(deployment_data.unit_test_name) }}
-  - runas: {{ context.users.deployer }}
-  - onchanges:
-    - cmd: buildout {{ deployment_name }}
-{%     else %}
-  cmd.wait:
-  - name: echo Nothing to do.  This deployment has no unit test.
-{%     endif %}
-  - require:
-    - cmd: buildout {{ deployment_name }}
-  - require_in:
-    - file: clear rebuild flag for {{ deployment_name }}
 
 {%     if deployment_data.get("upgrade", []) %}
 
