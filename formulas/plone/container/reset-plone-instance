@@ -47,7 +47,7 @@ if [ "$FORCE" != "1" ] ; then
     fi
 fi
 
-$debug service container-plone-"$instance"-green stop || true
+$debug service pod-plone-"$instance"-green stop || true
 $debug cd "$data_basedir"
 context=$(ls -Zd "$instance"-green/filestorage | cut -f 1 -d ' ' || true)
 $debug rm -rf "$instance"-green/blobstorage "$instance"-green/filestorage
@@ -56,4 +56,4 @@ $debug cp -a "$base"-green/filestorage "$instance"-green/filestorage
 if [ "$context" != "" ] ; then
     $debug chcon -R "$context" "$instance"-green/blobstorage "$instance"-green/filestorage
 fi
-$debug service container-plone-"$instance"-green start
+$debug service pod-plone-"$instance"-green start
