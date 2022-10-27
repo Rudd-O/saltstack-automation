@@ -54,11 +54,11 @@ for mustbe in mustbes:
         rets = []
         if not os.path.isdir(repodata):
             os.makedirs(release, exist_ok=True)
-            rets.append(run(["createrepo_c", release]))
+            rets.append(run(["bash", "-c", "createrepo_c %s >&2" % (shlex.quote(release),)]))
         if not rets or rets[-1] == 0:
             rets.append(run(cmd[:-1] + [dest + "/"]))
         if not rets or rets[-1] == 0:
-            rets.append(run(["createrepo_c", "--update", "-o", release, release]))
+            rets.append(run(["bash", "-c", "createrepo_c --update -o %s %s >&2" % (shlex.quote(release), shlex.quote(release))]))
         if not rets or rets[-1] == 0:
             relrelease = os.path.relpath(release, repo)
             rets.append(run(["rsync", "-aH", "--delete", "--", release + "/", {{ mirror_host }} + ":" + relrelease + "/"]))
