@@ -15,8 +15,8 @@ if fully_persistent_or_physical():
     Pkg.installed("ca-certificates", require_in=[Pkg("certbot")])
     pk = Pkg.installed("policycoreutils").requisite
     with Pkg.installed("certbot"):
-        Qubes.enable_dom0_managed_service("certbot-renew", enable=False)
-        Service.enabled("certbot-renew.timer")
+        q = Qubes.enable_dom0_managed_service("certbot-renew", enable=False).requisite
+        Service.enabled("certbot-renew.timer", require=[q])
     deps = [Qubes("certbot-renew"), Service("certbot-renew.timer"), pk]
 else:
     deps = []
@@ -89,15 +89,25 @@ if not template():
                 name=cmd,
                 require=[Service("nginx running in HTTP-only mode")] + deps,
                 watch_in=[Service("nginx")],
-                require_in=[Test("all certificates generated")],
-                onchanges_in=[Cmd("certbot timer running")] if at_least_one_is_not_fake else [],
+                require_in=[Test("all certificates generated")] + ([] if fake_for(host) else [Cmd("certbot timer running")]),
                 creates=cert,
             )
 
+    if at_least_one_is_not_fake:
+        # At least one needs the timer running.
+        # No onchanges parameter, so the command will run.
+        kwargs = {}
+    else:
+        # They are all fakes.  We avoid starting the service
+        # for no reason (it is enabled so it will start on
+        # reboot) by enabling the onchanges empty parameter.
+        kwargs = {"onchanges": []}
+
     Cmd.run(
         "certbot timer running",
-        name="systemctl start --no-block certbot-renew.timer",
-        onchanges=[],
+        name="systemctl is-active certbot-renew.timer >&2 && exit 0 ; systemctl start --no-block certbot-renew.timer && echo && echo changed=yes",
+        stateful=True,
+        **kwargs,
     )
 
     Test.nop(
