@@ -7,7 +7,6 @@ import json
 import os
 import subprocess
 import fcntl
-import posix_ipc
 import sys
 
 
@@ -15,10 +14,7 @@ class _RaiseExc(object): pass
 
 
 def _cmd_with_serialization(cmd, **kwargs):
-    with posix_ipc.Semaphore(
-        name="/pass.lock", flags=posix_ipc.O_CREAT, initial_value=3
-    ):
-        return subprocess.check_output(cmd, **kwargs)
+    return subprocess.check_output(cmd, **kwargs)
 
 
 def tree():
