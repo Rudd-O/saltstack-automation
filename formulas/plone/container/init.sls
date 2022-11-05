@@ -331,6 +331,9 @@ def deploy(i, n, processes, data):
     ).requisite
 
     # We have failed over to blue.
+    # FIXME: at this point we should only stop green once green has reached
+    # zero connections (plus the connection used to determine this stat, if any.)
+    # Tracking bug https://github.com/Pylons/waitress/issues/182
 
     green_dead = Podman.pod_dead(
         f"stop {nc_green}",
@@ -370,6 +373,9 @@ def deploy(i, n, processes, data):
     ).requisite
 
     # We have failed over to green.
+    # FIXME: at this point we should only stop blue once blue has reached
+    # zero connections (plus the connection used to determine this stat, if any.)
+    # Tracking bug https://github.com/Pylons/waitress/issues/182
 
     Podman.pod_dead(f"stop {nc_blue} again", name=nc_blue, require=[failover_to_green])
 
