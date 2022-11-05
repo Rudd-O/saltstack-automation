@@ -45,13 +45,13 @@ plone:
       datadir: /srv/plone
     users:
       process: plone
-    listen_addr: 127.0.5.1
     base_port: 8080
     deployments:
       master:
         image: "plone:5.2.7"
+        zeo_image: docker.io/plone/plone-zeo:latest
     director:
-    - host_regex: staging.example.org
+    - host_regex:"^staging.example.org$"
       deployment: master
       site: Plone
 ```
@@ -74,9 +74,21 @@ These settings would:
 * `plone:ssl_termination:hsts`: boolean defaulting to `True`; if
   disabled, HSTS headers are not included.
 
+### `plone:container` pillar
+
+Contains a dictionary with various defaults:
+
+* `green_listen_addr_prefix` / `blue_listen_addr_prefix`, the
+  first three octets of a local IP address where the blue / green
+  deployments should listen (the fourth is computed based on order).
+* `directories`: a set of paths that decode where the data is placed
+  (only `datadir` is supported).
+* `backend_processes`: default count of backend processes that
+  each backend will start.
+
 ### `plone:container:deployments` pillar
 
-This pillar contains a dictionary of `{name -> settings` where the
+This pillar contains a dictionary of `{name -> settings}` where the
 supported settings are:
 
 * `image`: defines the container image that will be used to deploy
@@ -90,6 +102,9 @@ supported settings are:
   data for this deployment based on the named deployment.
 * `delete`: if mentioned, delete all traces of the deployment.
 * (there are other undocumented settings at this time)
+* `backend_processes`: defines a custom backend process count
+  for this deployment, overriding the default `backend_processes`
+  for all deployments.
 
 All deployments are accessible directly under URL
 `https://<any server hostname>/deployments/<deployment name>`.
@@ -120,9 +135,6 @@ where the supported settings are:
 * `site`: defines a Plone site (URL fragment from the root of the
   Plone container) to serve at this hostname.  If unspecified, it
   will simply serve the root of the Plone container.
-* `backend_processes`: defines a custom backend process count
-  for this deployment, overriding the default `backend_processes`
-  for all deployments.
 
 If the client's URL or host do not match anything (because there
 is no matching director entry), no Plone backend will be selected
