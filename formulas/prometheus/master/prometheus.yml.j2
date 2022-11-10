@@ -221,6 +221,14 @@ scrape_configs:
       replacement: zope_connection_${2}
 {%- endif %}
 
+{%- if scraper.startswith("ebpf") %}
+    metric_relabel_configs:
+    -
+      source_labels: [__name__, device]
+      regex: 'ebpf_exporter.*;loop[0-9]+'
+      action: drop
+{%- endif %}
+
 {% endfor %}
 
 {% for module, data in scrapers.snmp.items() %}
