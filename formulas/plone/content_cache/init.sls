@@ -58,6 +58,7 @@ varnish:
 varnishd_connect_any:
   selinux.boolean:
   - value: true
+  - persist: true
   - require:
     - pkg: varnishpkg
   - require_in:
