@@ -14,6 +14,7 @@ httpd_can_network_relay for Plone:
   selinux.boolean:
   - name: httpd_can_network_relay
   - value: True
+  - persist: True
   - require_in:
     - service: nginx
   - require:
