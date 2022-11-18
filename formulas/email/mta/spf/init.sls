@@ -2,7 +2,7 @@
 
 include(".".join(sls.split(".")[:-1]) + ".postfix.service")
 
-Pkg.installed("pypolicyd-spf")
+Pkg.installed("pypolicyd-spf", pkgs=["python3-authres", "pypolicyd-spf"])
 
 slsp = sls.replace(".", "/")
 
