@@ -364,20 +364,28 @@ def pod_running(name, options, containers, dryrun=False, enable=None):
             unit = [a for a in allunits if "Description=Podman pod" in a][0]
             unit = "[Unit]\n" + unit
             unitls = unit.splitlines(True)
+            while any(unitl.endswith("\\\n") for unitl in unitls):
+                for n, line in enumerate(unitls):
+                    if line.endswith("\\\n"):
+                        unitls[n] = unitls[n][:-2] + unitls.pop(n+1)
+                        break
             execstartline = [n for n, l in enumerate(unitls) if l.startswith("ExecStart=")][0]
             execstopline = [n for n, l in enumerate(unitls) if l.startswith("ExecStop=")][0]
             execstoppostline = [n for n, l in enumerate(unitls) if l.startswith("ExecStopPost=")][0]
             unitls[execstartline] = unitls[execstartline].split("start")[0] + " pod start " + name + "\n"
             unitls[execstopline] = unitls[execstopline].split("stop")[0] + " pod stop " + name + "\n"
             unitls[execstoppostline] = unitls[execstoppostline].split("stop")[0] + " pod stop -i " + name + "\n"
-            unit = "".join([
-                u for u in unitls
-                if not u.startswith("Requires=container")
-                and not u.startswith("BindsTo=container")
-                and not u.startswith("Before=container") 
-                and not u.startswith("After=container")
-                and not u.startswith("#")
-            ])
+            unitls = [u for u in unitls if not u.startswith("#")]
+            for n, u in enumerate(unitls):
+                if (
+                    u.startswith("Requires=container")
+                    or u.startswith("BindsTo=container")
+                    or u.startswith("Before=container") 
+                    or u.startswith("After=container")
+                    or u.startswith("Wants=container")
+                ):
+                    unitls[n] = "# " + u
+            unit = "".join(unitls)
             a(
                 _single(
                     "systemd service creation",
