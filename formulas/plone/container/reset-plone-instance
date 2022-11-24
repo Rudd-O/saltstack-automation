@@ -12,8 +12,8 @@ instance="$1"
 if [ -z "$instance" ] ; then
     echo "Instance must be specified as the first parameter." >&2
     echo "The second parameter may be the base instance to copy data from." >&2
-    echo "Instances available (disregard '-green' and '-blue' suffixes):" >&2
-    ls -l "$data_basedir"
+    echo "Instances available:" >&2
+    ls -1 "$data_basedir" | sed -r 's/-(green|blue)$//' | sed "s/^/* /" | uniq
     exit 64
 fi
 
