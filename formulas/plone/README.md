@@ -99,7 +99,8 @@ supported settings are:
 * `zeo_image`: defines the container image that will be used to deploy
   ZEO.  By default this uses the stable ZEO image from `docker.io`.
 * `based_on`: when dealing with new deployments, initialize the
-  data for this deployment based on the named deployment.
+  data for this deployment based on the named deployment.  If this
+  deployment already exists, this setting is ignored.
 * `delete`: if mentioned, delete all traces of the deployment.
 * (there are other undocumented settings at this time)
 * `backend_processes`: defines a custom backend process count
