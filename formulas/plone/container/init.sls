@@ -4,6 +4,7 @@ import json
 
 from os.path import join
 from shlex import quote
+from pprint import pformat
 
 from salt://lib/qubes.sls import template
 
@@ -24,7 +25,7 @@ default_blue_listen_addr_prefix = context.get("blue_listen_addr_prefix", "127.0.
 deployments = context["deployments"]
 limit_to = pillar("limit_to", list(deployments.keys()))
 user = context["users"]["process"]
-director = context.get("director", {})
+director = context.get("director", [])
 default_backend_processes = context.get("backend_processes", 2)
 
 
@@ -105,25 +106,6 @@ def reqs():
 sysreq = reqs()
 
 
-def delete(n, data):
-    datadir = join(data_basedir, n)
-    lbn = f"remove deployment {n} from load balancer"
-    lbnn = Cmd.run(
-        lbn,
-        name="/usr/local/bin/varnish-set-backend --delete %s" % quote(n),
-        stateful=True,
-        require=[File("/usr/local/bin/varnish-set-backend")],
-    ).requisite
-    for color in "blue green".split():
-        nc = f"plone-{n}-{color}"
-        with Podman.pod_absent(
-            f"remove {nc}",
-            name=nc,
-            require=[lbnn],
-        ):
-            File.absent(f"{datadir}-{color}")
-
-
 def copy_over(source, destination, **kwargs):
     return Cmd.run(
         f"copy over {source} to {destination}",
@@ -164,7 +146,28 @@ def failover(n, deployment_addresses, director, **kwargs):
     )
 
 
-def deploy(i, n, processes, data):
+def delete(n, data, require=None):
+    # Returns the requisite of the first task dispatched here.
+    datadir = join(data_basedir, n)
+    lbnn = Cmd.run(
+        f"remove deployment {n} from load balancer",
+        name="/usr/local/bin/varnish-set-backend --delete %s" % quote(n),
+        stateful=True,
+        require=[File("/usr/local/bin/varnish-set-backend")] + (require or []),
+    ).requisite
+    for color in "blue green".split():
+        nc = f"plone-{n}-{color}"
+        with Podman.pod_absent(
+            f"remove {nc}",
+            name=nc,
+            require=[lbnn],
+        ):
+            File.absent(f"{datadir}-{color}")
+    return lbnn
+
+
+def deploy(i, n, processes, data, require=None):
+    # Returns the requisite of the last task dispatched here.
     datadir = join(data_basedir, n)
     blue_listen_addr_prefix = data.get("blue_listen_addr_prefix", default_blue_listen_addr_prefix)
     if not blue_listen_addr_prefix.endswith("."):
@@ -249,7 +252,7 @@ def deploy(i, n, processes, data):
             options=green_pod_options,
             containers=green_pod_containers,
             dryrun=True,
-            require=[sysreq],
+            require=(require or []),
         ).requisite
         blue_dead = Podman.pod_dead(
             f"stop {nc_blue}",
@@ -274,7 +277,7 @@ def deploy(i, n, processes, data):
             f"{blue_datadir}",
             user=user,
             mode="0755",
-            require=[sysreq],
+            require=(require or []),
             unless="test -d %s" % quote(blue_datadir),
         )
         co = [
@@ -293,7 +296,7 @@ def deploy(i, n, processes, data):
             f"{blue_datadir}",
             user=user,
             mode="0755",
-            require=[sysreq],
+            require=(require or []),
             unless="test -d %s" % quote(blue_datadir),
         ):
             for x in ["/filestorage", "/blobstorage"]:
@@ -377,7 +380,7 @@ def deploy(i, n, processes, data):
     # zero connections (plus the connection used to determine this stat, if any.)
     # Tracking bug https://github.com/Pylons/waitress/issues/182
 
-    Podman.pod_dead(f"stop {nc_blue} again", name=nc_blue, require=[failover_to_green])
+    return Podman.pod_dead(f"stop {nc_blue} again", name=nc_blue, require=[failover_to_green]).requisite
 
 
 # FIXME FOR QUBES SUPPORT
@@ -388,16 +391,47 @@ def deploy(i, n, processes, data):
 # involve going all the way back to the template to configure the services.
 # Also need to bind_dirs the directories where the container data is stored,
 # otherwise the containers will have serious trouble restarting after reboot.
+
+preflight = Test.nop("Preflight check complete", require=[sysreq]).requisite
+
+try:
+    first_deployment = list(deployments.keys())[0]
+except IndexError:
+    Test.fail_without_changes("No deployments defined in pillar plone:container.", require_in=[preflight])
+
+unknown_deployments = [
+    ent.get("deployment", first_deployment)
+    for ent in director
+    if (
+        ent.get("deployment", first_deployment) not in deployments
+        or deployments[ent.get("deployment", first_deployment)].get("delete")
+    )
+]
+if unknown_deployments:
+    Test.fail_without_changes(f"Deployments referenced in directors are unknown or deleted: {unknown_deployments}", require_in=[preflight])
+
+deletions = []
+creations = []
+
 for i, (deployment_name, deployment_data) in enumerate(deployments.items()):
     if deployment_name not in limit_to:
         continue
 
     if deployment_data.get("delete"):
-        delete(deployment_name, deployment_data)
+        deletions.append(delete(deployment_name, deployment_data, require=[preflight]))
     else:
         procs = deployment_data.get("backend_processes", default_backend_processes)
-        deploy(i, deployment_name, procs, deployment_data)
+        creations.append(deploy(i, deployment_name, procs, deployment_data, require=[preflight]))
 
+alldeployments = Test.nop(
+    "All needed deployments complete",
+    require=creations,
+).requisite
+Test.nop(
+    "All needed deletions begun",
+    require=[alldeployments],
+    require_in=deletions,
+)
 
 """
 {#
