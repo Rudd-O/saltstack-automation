@@ -274,6 +274,8 @@ scrape_configs:
 {%     set iface_relabel_data = {
          "eth.*":    {"type": "ethernet"},
          "br-.*":    {"type": "bridge"},
+         "wlan.*5g.*":  {"type": "wireless", "frequency": "5GHz"},
+         "wlan.*2g.*":  {"type": "wireless", "frequency": "2.4GHz"},
          "wlan0.*":  {"type": "wireless", "frequency": "5GHz"},
          "wlan1.*":  {"type": "wireless", "frequency": "2.4GHz"},
        } %}
