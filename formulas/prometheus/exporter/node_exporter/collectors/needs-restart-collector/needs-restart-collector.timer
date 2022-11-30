@@ -3,6 +3,7 @@ Description=Trigger Collect metrics of what services need to be restarted
 
 [Timer]
 OnBootSec=0
+OnBootsec=60
 OnUnitActiveSec=1 hours
 
 [Install]
