@@ -43,8 +43,14 @@ p_ = subprocess.Popen("systemctl show * -p Id,ActiveState,SubState".split(),
 in_ = p_.stdout.read()
 ret_ = p_.wait()
 
-with atomic_outputter(sys.argv[1]) as out:
-    def unitadd(d, unit):
+class flushable(object):
+
+    def __init__(self, out):
+        self.out = out
+        self.unit = {}
+        self.flushed = False
+
+    def unitadd(self, d):
         if len(d) != 2: return
         for src, dst in [
             ("Id", "service"),
@@ -54,35 +60,35 @@ with atomic_outputter(sys.argv[1]) as out:
             if d[0] == src:
                 d[0] = dst
         try:
-            unit[d[0]] = d[1]
+            self.unit[d[0]] = d[1]
         except IndexError:
             assert 0, d
-    def unitflush(unit, flushed):
-        if not unit: return
-        if unit["service"].endswith(".device"):
+
+    def unitflush(self):
+        if not self.unit: return
+        if self.unit["service"].endswith(".device"):
             return
-        if unit["service"].startswith("run-"):
+        if self.unit["service"].startswith("run-"):
             return
-        if not flushed:
-            print("# HELP systemd_unit_state Tracks the state of a systemd unit.", file=out)
-            flushed = True
+        if not self.flushed:
+            print("# HELP systemd_unit_state Tracks the state of a systemd unit.", file=self.out)
+            self.flushed = True
         out.write("systemd_unit_state{")
         out.write(",".join(
             k + "=" + '"' + unescape(v) + '"'
-            for k, v in sorted(unit.items())
+            for k, v in sorted(self.unit.items())
         ))
-        out.write("} 1\n")
-        unit.clear()
-    flushed = False
-    unit = {}
+        self.out.write("} 1\n")
+        self.unit.clear()
+
+
+with atomic_outputter(sys.argv[1]) as out:
+    u = flushable(out)
     for line in in_.splitlines(True):
         if line != '\n':
-            unitadd(line.strip().split("=", 1), unit)
+            u.unitadd(line.strip().split("=", 1))
         else:
-            unitflush(unit, flushed)
-            flushed = True
+            u.unitflush()
     end = time.time()
-    if flushed:
-        out.write("systemd_unit_state_collector_start_time_seconds %s\n" % start)
-        out.write("systemd_unit_state_collector_end_time_seconds %s\n" % end)
-    unitflush(unit, flushed)
+    out.write("systemd_unit_state_collector_start_time_seconds %s\n" % start)
+    out.write("systemd_unit_state_collector_end_time_seconds %s\n" % end)

@@ -20,10 +20,10 @@ done
 
 end=$(date +%s.%N)
 
-if [ "$move" == "1" ] ; then
+#if [ "$move" == "1" ] ; then
   echo "needs_restart_collector_start_time_seconds $start" >> "$1".$$
   echo "needs_restart_collector_end_time_seconds $end" >> "$1".$$
   mv -f "$1".$$ "$1"
-else
-  rm -f "$1"
-fi
+#else
+#  rm -f "$1"
+#fi
