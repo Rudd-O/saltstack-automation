@@ -34,6 +34,7 @@ def collector(n, ext=None):
             makedirs=True,
             require=[Test("Collector directory created")],
             **Perms.dir,
+
         ).requisite
 
         service = File.managed(
@@ -43,6 +44,12 @@ def collector(n, ext=None):
             context={"textfile_directory": textfile_directory, "exe": exe},
             watch_in=[Cmd("Reload systemd for node exporter")],
             require=[prog, colldir],
+            selinux={
+                "seuser": "system_u",
+                "serole": "object_r",
+                "setype": "bin_t",
+                "serange": "s0",
+            },
             **Perms.file,
         ).requisite
 
