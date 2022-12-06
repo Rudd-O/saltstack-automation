@@ -19,12 +19,17 @@ if fully_persistent_or_physical() or dom0():
     ).requisite
 
     if grains("os") == "Fedora":
-        Maint.services_restarted(
+        rest = Maint.services_restarted(
             "Restart services",
             require=[updreq, Test("needs-restart deployed")],
             exclude_services_globs=config['update'].restart_exclude_services,
             exclude_paths=config['update'].restart_exclude_paths,
-        )
+        ).requisite
+        if __salt__["service.available"]("needs-restart-collector"):
+            Cmd.run(
+                "systemctl start --no-block needs-restart-collector",
+                onchanges=[rest],
+            )
     Cmd.run(
         "check ZFS module after",
         name=tpl % {"stage": "after"},
