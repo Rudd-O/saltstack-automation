@@ -10,11 +10,30 @@ def get_services_that_need_restart(exclude_services_globs=None, exclude_paths=No
     needsrestart = ["needs-restart", "-b", "-u"]
     for p in exclude_paths:
         needsrestart.extend(["-i", p])
-    needsrestartoutput = subprocess.check_output(needsrestart, universal_newlines=True)
-    needsrestartreport = subprocess.check_output(
-        ["needs-restart"], universal_newlines=True
-    )
-    svcs = [s for s in needsrestartoutput.splitlines() if s]
+    try:
+        needsrestartoutput = subprocess.run(
+            needsrestart,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        needsrestartreport = subprocess.run(
+            ["needs-restart"],
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        return {
+            "command": exc.cmd,
+            "error": exc.stderr,
+        }
+    except FileNotFoundError:
+        return {
+            "command": "no command",
+            "error": "needs-restart not found"
+        }
+    svcs = [s for s in needsrestartoutput.stdout.splitlines() if s]
     restartable = [s for s in svcs if not re.match("|".join(exclude_services_globs), s)]
     nonrestartable = [s for s in svcs if re.match("|".join(exclude_services_globs), s)]
     return {
@@ -37,6 +56,12 @@ def restart_services(test=False, exclude_services_globs=None, exclude_paths=None
     exclude_services_globs = exclude_services_globs or []
     exclude_paths = exclude_paths or []
     svcs = get_services_that_need_restart(exclude_services_globs, exclude_paths)
+    if "error" in svcs:
+        return {
+            "restarted": [],
+            "failed": {"needs-restart": svcs["command"]},
+            "report": svcs["error"],
+        }
     res = {
         "restarted": [],
         "failed": collections.OrderedDict(),
