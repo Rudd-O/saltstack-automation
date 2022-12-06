@@ -16,6 +16,7 @@ default_exclude_services = [
     "qubes-qrexec-agent.service", # Logs out Salt itself.
     "qubes-gui-agent.service", # Logs out Salt itself.
     "auditd.service", # Can only be requested by dependency.
+    "plymouth-start.service", # No need to restart.
     "^getty@",
     "^user@",
     ".+scope$",
