@@ -39,7 +39,7 @@ def get_services_that_need_restart(exclude_services_globs=None, exclude_paths=No
     return {
         "restartable": restartable,
         "nonrestartable": nonrestartable,
-        "report": needsrestartreport.rstrip(),
+        "report": needsrestartreport.stdout.rstrip(),
     }
 
 
