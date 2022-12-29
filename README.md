@@ -17,6 +17,10 @@ Formulas are under [`formulas`](formulas/).  Here is an overview:
 * [Wireguard](formulas/wireguard/) sets up simple wg-quick Wireguard networks among multiple hosts.  You can set up more than one.  See the `README.md` file in that directory.
 * [Email](formulas/email) sets up various e-mail system components.
 
+## SaltStack `bombshell-client` adapters for Qubes OS
+
+This program also contains a set of shims that can be used to make `salt-ssh` work against Qubes OS qubes, whether local or remote.  See the  [bin/README.md](bin/README.md) file for more information.
+
 ## License
 
 The code contained within is licensed under the GNU GPL v2.
