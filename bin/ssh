@@ -8,6 +8,20 @@ import time
 import yaml
 
 
+roster_file = os.environ.get("SALT_SSH_ROSTER")
+if not roster_file:
+    assert 0, "The SALT_SSH_ROSTER environment variable has not been exported.  Point this variable to your roster file."
+if not os.path.isfile(roster_file):
+    assert 0, "The SALT_SSH_ROSTER environment variable points to a nonexistent file %s.  Fix this." % os.path.abspath(roster_file)
+
+
+logfile_file = os.environ.get("QUBES_BOMBSHELL_ADAPTER_LOG")
+if logfile_file:
+    logfile = open(logfile_file), "a")
+else:
+    logfile = None
+
+
 def find_hostname_username_and_command(parms, cmd_type):
   host = None
   user = None
@@ -101,18 +115,16 @@ childenv["PATH"] = os.path.pathsep.join(newpath)
 
 myself = os.path.basename(__file__)
 
-if 0:
-    logfile = open(os.path.join(os.path.dirname(__file__), "../log/qubes-bombshell-adapter"), "a")
+if logfile:
     logfile.write("%.2f Bombshell adapter %s: Salt sent us arguments: %s\n" % (
         time.time(), myself, sys.argv[1:]
     ))
-else:
-    logfile = None
 if len(sys.argv[1:]) == 1 and sys.argv[1] == "-V":
     args = (myself, [myself] + sys.argv[1:], childenv)
 else:
     host, user, cmd, opts = find_hostname_username_and_command(sys.argv[1:], myself)
-    roster = yaml.safe_load(open(os.path.join(os.path.dirname(__file__), "../config/roster")))
+    with open(roster_file) as roster_fd:
+        roster = yaml.safe_load(roster_fd)
     if logfile:
         logfile.write("%.2f Bombshell adapter %s: connection type for host %s is %s\n" % (
             time.time(), myself, host, roster.get(host, {}).get("connection_type")

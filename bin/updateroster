@@ -11,15 +11,16 @@ import collections
 import copy
 import os
 import yaml
+import sys
 
 
-roster_file = os.path.join(
-    os.path.dirname(os.path.realpath(__file__)), "..", "config", "roster"
-)
-nodegroups_file = os.path.join(
-    os.path.dirname(os.path.realpath(__file__)), "..", "config", "nodegroups"
-)
-pillar_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "pillar")
+try:
+    roster_file = sys.argv[1]
+    nodegroups_file = sys.argv[2]
+    pillar_dir = sys.argv[3]
+except IndexError:
+    assert 0, "This program requires the roster file, the nodegroups file, and the pillar base directory as the first three arguments."
+
 groups_file = os.path.join(pillar_dir, "nodegroups.sls")
 dom0s_file = os.path.join(pillar_dir, "qubes", "dom0s.sls")
 physical_hosts_file = os.path.join(pillar_dir, "homenetwork", "from_roster.sls")
