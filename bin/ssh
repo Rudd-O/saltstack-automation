@@ -1,0 +1,156 @@
+#!/usr/bin/python3 -u
+
+import os
+import shlex
+import subprocess
+import sys
+import time
+import yaml
+
+
+def find_hostname_username_and_command(parms, cmd_type):
+  host = None
+  user = None
+  rest = parms
+  opts = []
+  while True:
+    if not rest:
+      break
+    if rest[0] == "--":
+      if host is None:
+        _, host, rest = rest[0], rest[1], rest[2:]
+      else:
+        _, rest = rest[0], rest[1:]
+      break
+    elif rest[0].startswith("-o") and len(rest[0]) > 2:
+      if rest[0].startswith("-oUser="):
+        user = rest[1][7:]
+      elif rest[0].startswith("-oIdentityFile="): # FIXME not the right way
+        pass
+      else:
+        opts += [rest[0][2:]]
+      _, rest = rest[0], rest[1:]
+    elif rest[0].startswith("-o"):
+      if rest[1].startswith("User="):
+        user = rest[1][5:]
+      elif rest[1].startswith("IdentityFile="): # FIXME not the right way
+        pass
+      else:
+        opts += [rest[1]]
+      _, rest = rest[0:1], rest[2:]
+    elif rest[0].startswith("-"):
+      _, rest = rest[0], rest[1:]
+    else:
+      if host is None:
+        host, rest = rest[0], rest[1:]
+      else:
+        break
+  if cmd_type == "ssh":
+    host, _ = (host + ":").split(":", 1)
+  elif cmd_type == "scp":
+    local_file = host
+    remote_file = rest[0].split(":")[1]
+    host = rest[0].split(":")[0]
+    rest = [local_file, remote_file] + rest[1:]
+  else:
+    assert 0, "not reached (my cmd_type: %s)" % cmd_type
+  return host, user, rest, opts
+
+
+def proxyize(theroster, thehost, cmd, opts, vmname=None, extra_sh_c=True):
+    if vmname is None:
+        vmname = thehost
+    if theroster.get(thehost, {}).get("vmname"):
+        vmname = theroster.get(thehost, {}).get("vmname")
+    if theroster.get(thehost, {}).get("proxy"):
+        proxy = theroster.get(thehost, {}).get("proxy")
+        if logfile:
+            logfile.write("%.2f Bombshell adapter %s: proxy for host %s is %s\n" % (
+                time.time(), myself, thehost, proxy)
+            )
+        therest = ["bombshell-client"]
+        if os.getenv("BOMBSHELL_DEBUG"): therest.append("-d")
+        therest.append(vmname)
+        if extra_sh_c:
+            last = cmd.pop()
+            cmd.append("sh")
+            cmd.append("-c")
+            cmd.append(last)
+        therest.extend(cmd)
+        dashoopts = []
+        for opt in opts:
+          dashoopts += ["-o", opt]
+        ret = ["ssh"] + dashoopts + [proxy, '--', " ".join(shlex.quote(x) for x in therest)]
+        return ret
+    else:
+        if extra_sh_c:
+            last = cmd.pop()
+            cmd.append("sh")
+            cmd.append("-c")
+            cmd.append(last)
+        return ["bombshell-client", vmname] + cmd
+
+
+path = os.environ.get("PATH", "")
+newpath = []
+for pathelm in path.split(os.path.pathsep):
+    if os.path.abspath(pathelm) != os.path.abspath(os.path.dirname(__file__)):
+        newpath.append(pathelm)
+childenv = dict(os.environ)
+childenv["PATH"] = os.path.pathsep.join(newpath)
+
+myself = os.path.basename(__file__)
+
+if 0:
+    logfile = open(os.path.join(os.path.dirname(__file__), "../log/qubes-bombshell-adapter"), "a")
+    logfile.write("%.2f Bombshell adapter %s: Salt sent us arguments: %s\n" % (
+        time.time(), myself, sys.argv[1:]
+    ))
+else:
+    logfile = None
+if len(sys.argv[1:]) == 1 and sys.argv[1] == "-V":
+    args = (myself, [myself] + sys.argv[1:], childenv)
+else:
+    host, user, cmd, opts = find_hostname_username_and_command(sys.argv[1:], myself)
+    roster = yaml.safe_load(open(os.path.join(os.path.dirname(__file__), "../config/roster")))
+    if logfile:
+        logfile.write("%.2f Bombshell adapter %s: connection type for host %s is %s\n" % (
+            time.time(), myself, host, roster.get(host, {}).get("connection_type")
+        ))
+    if roster.get(host, {}).get("connection_type") == "qubes":
+        if myself == "scp":
+            local_file = cmd[0]
+            remote_file = cmd[1]
+            cmd = ["sh", "-c", "cat > %s" % shlex.quote(remote_file)]
+        if user is not None:
+            cmd = ["sudo", "-u", user] + cmd
+        if myself == "scp":
+            cmd = proxyize(roster, host, cmd, opts, vmname=roster[host].get("vm_name", host), extra_sh_c=False)
+            if logfile:
+                logfile.write("%.2f Bombshell adapter %s: copying %s to %s with command %s\n" % (time.time(), myself, local_file, remote_file, cmd))
+                logfile.flush()
+            lfd = open(local_file, "rb")
+            p = subprocess.Popen(cmd, env=childenv, stdin=lfd, close_fds=True, universal_newlines=False)
+            lfd.close()
+            ret = p.wait()
+            if logfile:
+                logfile.write("%.2f Bombshell adapter %s: copy finished with return code %s\n" % (time.time(), myself, ret))
+                logfile.flush()
+                logfile.close()
+            sys.exit(ret)
+        else:
+            proxied_cmd = proxyize(roster, host, cmd, opts, vmname=roster[host].get("vm_name", host))
+            args = (proxied_cmd[0], proxied_cmd, childenv)
+    else:
+        args = (myself, [myself] + sys.argv[1:], childenv)
+
+if logfile:
+    logfile.write("%.2f Bombshell adapter %s: running with arguments %s\n" % (time.time(), myself, args[1]))
+    logfile.flush()
+# open("/tmp/x", "w").write(" ".join(shlex.quote(x) for x in args[1]))
+ret = subprocess.call(args[1], env=args[2], close_fds=True, universal_newlines=False)
+if logfile:
+    logfile.write("%.2f Bombshell adapter %s: command finished with return code %s\n" % (time.time(), myself, ret))
+    logfile.flush()
+    logfile.close()
+sys.exit(ret)

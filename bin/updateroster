@@ -1,0 +1,218 @@
+#!/usr/bin/python3
+
+# TODO FIXME IMPROVEMENTS:
+# 1. do not run the roster generation code if the output files
+#    are all newer than the source roster or any other of the
+#    source files
+# Not urgent tho.  salt-run will only update roster once.
+
+import fcntl
+import collections
+import copy
+import os
+import yaml
+
+
+roster_file = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)), "..", "config", "roster"
+)
+nodegroups_file = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)), "..", "config", "nodegroups"
+)
+pillar_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "pillar")
+groups_file = os.path.join(pillar_dir, "nodegroups.sls")
+dom0s_file = os.path.join(pillar_dir, "qubes", "dom0s.sls")
+physical_hosts_file = os.path.join(pillar_dir, "homenetwork", "from_roster.sls")
+vm_templates_file = os.path.join(pillar_dir, "qubes", "vm_templates.sls")
+vms_file = os.path.join(pillar_dir, "qubes", "vms.sls")
+
+
+def _generate(roster, attr):
+    groups = {}
+    for key, val in roster.items():
+        if attr in val:
+            val_groups = val[attr]
+            if type(val_groups) != list:
+                val_groups = [val_groups]
+            for val_group in val_groups:
+                gg = val_group.split(":")
+                ggd = groups
+                for g in gg:
+                    if g not in ggd:
+                        ggd[g] = {}
+                    ggd = ggd[g]
+                ggd[key] = True
+    return groups
+
+
+def generate_groups(roster):
+    return {"nodegroups": _generate(roster, "nodegroups")}
+
+
+def generate_physical_hosts(roster):
+    d = {"physical_hosts": {}, "vms": {}, "macs": {}}
+    for host, data in roster.items():
+        addr = data.get("host")
+        type = "physical_hosts"
+        if data.get("mac"):
+            d["macs"][host] = data["mac"]
+        if not addr:
+            addr = data.get("vm_ip")
+            type = "vms"
+        if not addr:
+            continue
+        d[type][host] = addr
+    return {"homenetwork": d}
+
+
+def generate_nodegroups(roster):
+    n = collections.defaultdict(list)
+    for roster_item_name, roster_item in roster.items():
+        nodegroups = roster_item.get("nodegroups", [])
+        for x in nodegroups:
+            n[x].append(roster_item_name)
+    nn = dict()
+    for k, v in n.items():
+        nn[k] = v
+    return {"ssh_list_nodegroups": nn, "nodegroups": nn}
+
+
+def generate_dom0s(roster):
+    x = _generate(roster, "dom0")
+    g = {"qubes": {"dom0s": {}}}
+    gg = g["qubes"]["dom0s"]
+    for key, val in x.items():
+        for v in val:
+            gg[v] = key
+    return g
+
+
+def generate_vms(roster):
+    g = {"qubes": {"vms": {}}}
+    gg = g["qubes"]["vms"]
+    for minion_id, data in roster.items():
+        if data.get("connection_type") != "qubes" and "vm_class" not in data:
+            continue
+        if data.get("vm_class") == "AdminVM":
+            continue
+        data = copy.deepcopy(data)
+        for attr in ["connection_type", "proxy", "groups"]:
+            if attr in data:
+                del data[attr]
+        if "vm_name" not in data:
+            data["vm_name"] = minion_id
+        gg[minion_id] = data
+    return g
+
+
+def generate_vm_templates(roster):
+    x = _generate(roster, "vm_template")
+    g = {"qubes": {"vm_templates": {}}}
+    gg = g["qubes"]["vm_templates"]
+    for key, val in x.items():
+        for v in val:
+            gg[v] = key
+    return g
+
+
+def recursively_fix_allbools(d):
+    try:
+        isallbools = True
+        for key, val in d.items():
+            if type(val) is not bool:
+                isallbools = False
+        if isallbools:
+            return list(d.keys())
+        for key, val in d.items():
+            if key != "vm_services":  # VM services support all bools.
+                d[key] = recursively_fix_allbools(val)
+    except AttributeError:
+        return d
+    return d
+
+
+def check_roster(roster, dom0s, vm_templates, unused_vms):
+    for roster_item, data in roster.items():
+        if "connection_type" in data or "vm_class" in data:
+            if "." in roster_item:
+                assert data["vm_name"] == roster_item.split(".")[0], roster_item
+                assert "proxy" in data, roster_item
+                if "dom0" in data:
+                    proxy = data["proxy"].replace(".dragonfear", "")
+                    dom0 = data["dom0"]
+                    assert dom0s["qubes"]["dom0s"][proxy] == dom0, (
+                        dom0s["qubes"]["dom0s"][proxy],
+                        dom0,
+                        roster_item,
+                    )
+                assert "vm_class" in data, (
+                    "%s does not have a vm_class attribute" % roster_item
+                )
+                assert data["vm_class"] in [
+                    "AdminVM",
+                    "TemplateVM",
+                    "AppVM",
+                    "NetVM",
+                    "StandaloneVM",
+                ], (
+                    "%s does not have a valid vm_class attribute" % roster_item
+                )
+                if "dom0" in data:
+                    assert "vm_label" in data, roster_item
+                    assert data["vm_label"] in [
+                        "black",
+                        "blue",
+                        "green",
+                        "orange",
+                        "red",
+                        "purple",
+                        "yellow",
+                        "gray",
+                    ]
+            else:
+                assert "proxy" not in data, roster_item
+            if "vm_template" in data:
+                assert (
+                    data["dom0"] == dom0s["qubes"]["dom0s"][data["vm_template"]]
+                ), roster_item
+
+
+lockf = roster_file + ".lock"
+with open(lockf, "w") as fd:
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        with open(roster_file) as roster_fd:
+            roster = yaml.load(roster_fd, Loader=yaml.SafeLoader)
+
+        groups = recursively_fix_allbools(generate_groups(roster))
+        nodegroups = generate_nodegroups(roster)
+        physical_hosts = generate_physical_hosts(roster)
+        dom0s = recursively_fix_allbools(generate_dom0s(roster))
+        vm_templates = recursively_fix_allbools(generate_vm_templates(roster))
+        vms = recursively_fix_allbools(generate_vms(roster))
+
+        check_roster(roster, dom0s, vm_templates, vms)
+
+        with open(groups_file, "w") as fd:
+            fd.write(yaml.dump(groups))
+
+        with open(nodegroups_file, "w") as fd:
+            fd.write(yaml.dump(nodegroups))
+
+        with open(physical_hosts_file, "w") as fd:
+            fd.write(yaml.dump(physical_hosts))
+
+        with open(dom0s_file, "w") as fd:
+            fd.write(yaml.dump(dom0s))
+
+        with open(vm_templates_file, "w") as fd:
+            fd.write(yaml.dump(vm_templates))
+
+        with open(vms_file, "w") as fd:
+            fd.write(yaml.dump(vms))
+
+    finally:
+        try:
+            os.unlink(lockf)
+        except FileNotFoundError:
+            pass
