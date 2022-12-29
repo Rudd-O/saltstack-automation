@@ -194,23 +194,24 @@ with open(lockf, "w") as fd:
 
         check_roster(roster, dom0s, vm_templates, vms)
 
-        with open(groups_file, "w") as fd:
-            fd.write(yaml.dump(groups))
+        def safe_write(fn, content):
+            with open(groups_file + ".tmp", "w") as fd:
+                fd.write(content)
+            try:
+                os.rename(groups_file + ".tmp", groups_file)
+            except Exception:
+                try:
+                    os.unlink(groups_file + ".tmp")
+                except Exception:
+                    pass
+                raise
 
-        with open(nodegroups_file, "w") as fd:
-            fd.write(yaml.dump(nodegroups))
-
-        with open(physical_hosts_file, "w") as fd:
-            fd.write(yaml.dump(physical_hosts))
-
-        with open(dom0s_file, "w") as fd:
-            fd.write(yaml.dump(dom0s))
-
-        with open(vm_templates_file, "w") as fd:
-            fd.write(yaml.dump(vm_templates))
-
-        with open(vms_file, "w") as fd:
-            fd.write(yaml.dump(vms))
+        safe_write(groups_file, yaml.dump(groups))
+        safe_write(nodegroups_file, yaml.dump(nodegroups))
+        safe_write(physical_hosts_file, yaml.dump(physical_hosts))
+        safe_write(dom0s_file, yaml.dump(dom0s))
+        safe_write(vm_templates_file, yaml.dump(vm_templates))
+        safe_write(vms_file, yaml.dump(vms))
 
     finally:
         try:
