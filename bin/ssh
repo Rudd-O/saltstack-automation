@@ -17,7 +17,7 @@ if not os.path.isfile(roster_file):
 
 logfile_file = os.environ.get("QUBES_BOMBSHELL_ADAPTER_LOG")
 if logfile_file:
-    logfile = open(logfile_file), "a")
+    logfile = open(logfile_file, "a")
 else:
     logfile = None
 
