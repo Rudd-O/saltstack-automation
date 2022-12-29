@@ -4,7 +4,17 @@ from shlex import quote
 
 def _single(subname, *args, **kwargs):
     ret = __salt__["state.single"](*args, **kwargs)
-    ret = list(ret.values())[0]
+    try:
+        ret = list(ret.values())[0]
+    except AttributeError:
+        try:
+            ret = {
+                "changes": {},
+                "result": False,
+                "comment": ret[0],
+            }
+        except Exception:
+            assert 0, ret
     ret["name"] = subname
     return ret
 

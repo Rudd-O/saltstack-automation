@@ -25,7 +25,14 @@ def _single(subname, *args, **kwargs):
     try:
         ret = list(ret.values())[0]
     except AttributeError:
-        assert 0, ret
+        try:
+            ret = {
+                "changes": {},
+                "result": False,
+                "comment": ret[0],
+            }
+        except Exception:
+            assert 0, ret
     ret["name"] = subname
     return ret
 
