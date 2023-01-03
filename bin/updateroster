@@ -195,13 +195,14 @@ with open(lockf, "w") as fd:
         check_roster(roster, dom0s, vm_templates, vms)
 
         def safe_write(fn, content):
-            with open(groups_file + ".tmp", "w") as fd:
+            with open(fn + ".tmp", "w") as fd:
                 fd.write(content)
             try:
-                os.rename(groups_file + ".tmp", groups_file)
+                os.rename(fn + ".tmp", fn)
             except Exception:
+                assert 0
                 try:
-                    os.unlink(groups_file + ".tmp")
+                    os.unlink(fn + ".tmp")
                 except Exception:
                     pass
                 raise
