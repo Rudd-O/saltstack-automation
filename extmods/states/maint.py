@@ -9,7 +9,8 @@ def services_restarted(name, exclude_services_globs=None, exclude_paths=None):
         exclude_services_globs=exclude_services_globs,
         exclude_paths=exclude_paths,
     )
-    k = __salt__["maint.get_kernel_reboot_required"]()
+    kernel = __salt__["maint.get_kernel_reboot_required"]()
+    xen = __salt__["maint.get_xen_reboot_required"]()
     comment = ["needs-restart report:\n" + r["report"]]
     if r["failed"]:
         comment.append(
@@ -30,7 +31,9 @@ def services_restarted(name, exclude_services_globs=None, exclude_paths=None):
             "Nonrestartable services:\n%s"
             % "\n".join(["- %s" % k for k in r["nonrestartable"]])
         )
-    if k:
-        comment.append(k)
+    if kernel:
+        comment.append(kernel)
+    if xen:
+        comment.append(xen)
     ret["comment"] = "\n\n".join(comment) if comment else None
     return ret
