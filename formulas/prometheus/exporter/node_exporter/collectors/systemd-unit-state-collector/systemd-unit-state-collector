@@ -2,12 +2,12 @@
 
 import time
 
-start = time.time()
-
 import contextlib
 import os
 import sys
 import subprocess
+import time
+
 
 def unescape(escaped):
     return escaped.replace("\\", "\\\\")
@@ -36,59 +36,66 @@ def atomic_outputter(filename):
             os.rename(tmpf, finalf)
 
 
-p_ = subprocess.Popen("systemctl show * -p Id,ActiveState,SubState".split(),
-                      stdout=subprocess.PIPE,
-                      stdin=open(os.devnull),
-                      universal_newlines=True)
-in_ = p_.stdout.read()
-ret_ = p_.wait()
+def iter():
+    in_ = subprocess.run(
+        "systemctl show * -p Id,ActiveState,SubState".split(),
+        capture_output=True,
+        check=True,
+        universal_newlines=True
+    ).stdout
 
-class flushable(object):
+    class flushable(object):
 
-    def __init__(self, out):
-        self.out = out
-        self.unit = {}
-        self.flushed = False
+        def __init__(self, out):
+            self.out = out
+            self.unit = {}
+            self.flushed = False
 
-    def unitadd(self, d):
-        if len(d) != 2: return
-        for src, dst in [
-            ("Id", "service"),
-            ("ActiveState", "state"),
-            ("SubState", "substate"),
-        ]:
-            if d[0] == src:
-                d[0] = dst
-        try:
-            self.unit[d[0]] = d[1]
-        except IndexError:
-            assert 0, d
+        def unitadd(self, d):
+            if len(d) != 2: return
+            for src, dst in [
+                ("Id", "service"),
+                ("ActiveState", "state"),
+                ("SubState", "substate"),
+            ]:
+                if d[0] == src:
+                    d[0] = dst
+            try:
+                self.unit[d[0]] = d[1]
+            except IndexError:
+                assert 0, d
 
-    def unitflush(self):
-        if not self.unit: return
-        if self.unit["service"].endswith(".device"):
-            return
-        if self.unit["service"].startswith("run-"):
-            return
-        if not self.flushed:
-            print("# HELP systemd_unit_state Tracks the state of a systemd unit.", file=self.out)
-            self.flushed = True
-        out.write("systemd_unit_state{")
-        out.write(",".join(
-            k + "=" + '"' + unescape(v) + '"'
-            for k, v in sorted(self.unit.items())
-        ))
-        self.out.write("} 1\n")
-        self.unit.clear()
+        def unitflush(self):
+            if not self.unit: return
+            if self.unit["service"].endswith(".device"):
+                return
+            if self.unit["service"].startswith("run-"):
+                return
+            if not self.flushed:
+                print("# HELP systemd_unit_state Tracks the state of a systemd unit.", file=self.out)
+                self.flushed = True
+            out.write("systemd_unit_state{")
+            out.write(",".join(
+                k + "=" + '"' + unescape(v) + '"'
+                for k, v in sorted(self.unit.items())
+            ))
+            self.out.write("} 1\n")
+            self.unit.clear()
 
 
-with atomic_outputter(sys.argv[1]) as out:
-    u = flushable(out)
-    for line in in_.splitlines(True):
-        if line != '\n':
-            u.unitadd(line.strip().split("=", 1))
-        else:
-            u.unitflush()
-    end = time.time()
-    out.write("systemd_unit_state_collector_start_time_seconds %s\n" % start)
-    out.write("systemd_unit_state_collector_end_time_seconds %s\n" % end)
+    with atomic_outputter(sys.argv[1]) as out:
+        start = time.time()
+        u = flushable(out)
+        for line in in_.splitlines(True):
+            if line != '\n':
+                u.unitadd(line.strip().split("=", 1))
+            else:
+                u.unitflush()
+        end = time.time()
+        out.write("systemd_unit_state_collector_start_time_seconds %s\n" % start)
+        out.write("systemd_unit_state_collector_end_time_seconds %s\n" % end)
+
+
+while True:
+    iter()
+    time.sleep(5*60)

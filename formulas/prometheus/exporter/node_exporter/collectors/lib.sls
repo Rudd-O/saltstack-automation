@@ -30,6 +30,7 @@ def collector(n, ext=None):
             "setype": "bin_t",
             "serange": "s0",
         } if selinux_state in ("Permissive", "Enforcing") else None
+        selinux = None
         prog = File.managed(
             exe,
             source=f"salt://{slsp}/{n}{ext}",
