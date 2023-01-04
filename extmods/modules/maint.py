@@ -34,8 +34,8 @@ def get_services_that_need_restart(exclude_services_globs=None, exclude_paths=No
             "error": "needs-restart not found"
         }
     svcs = [s for s in needsrestartoutput.stdout.splitlines() if s]
-    restartable = [s for s in svcs if not re.match("|".join(exclude_services_globs), s)]
-    nonrestartable = [s for s in svcs if re.match("|".join(exclude_services_globs), s)]
+    restartable = [s for s in svcs if not exclude_services_globs or not re.match("|".join(exclude_services_globs), s)]
+    nonrestartable = [s for s in svcs if exclude_services_globs and re.match("|".join(exclude_services_globs), s)]
     return {
         "restartable": restartable,
         "nonrestartable": nonrestartable,
@@ -110,4 +110,28 @@ def get_kernel_reboot_required():
     ).strip()
     if latest_kernel != current_kernel:
         return f"System runs kernel {current_kernel} and needs to reboot to upgrade to kernel {latest_kernel}"
+    return ""
+
+
+def get_xen_reboot_required():
+    try:
+        latest_xen = subprocess.check_output(
+            "set -o pipefail ; rpm -q --queryformat=%{version} xen-hypervisor | sort -gr",
+            shell=True,
+            universal_newlines=True,
+        ).strip()
+    except subprocess.CalledProcessError:
+        # No RPM.
+        return ""
+    try:
+        current_xen = subprocess.check_output(
+            "set -o pipefail ; xl info | grep ^xen_version | cut -d : -f 2",
+            shell=True,
+            universal_newlines=True,
+        ).strip()
+    except subprocess.CalledProcessError:
+        # No Xen.
+        return ""
+    if latest_xen != current_xen:
+        return f"System runs Xen {current_xen} and needs to reboot to upgrade to kernel {latest_xen}"
     return ""
