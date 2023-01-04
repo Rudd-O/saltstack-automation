@@ -28,7 +28,7 @@ vm_templates_file = os.path.join(pillar_dir, "qubes", "vm_templates.sls")
 vms_file = os.path.join(pillar_dir, "qubes", "vms.sls")
 
 
-def _generate(roster, attr):
+def _generate_tree(roster, attr):
     groups = {}
     for key, val in roster.items():
         if attr in val:
@@ -47,7 +47,7 @@ def _generate(roster, attr):
 
 
 def generate_groups(roster):
-    return {"nodegroups": _generate(roster, "nodegroups")}
+    return {"nodegroups": _generate_tree(roster, "nodegroups")}
 
 
 def generate_physical_hosts(roster):
@@ -79,7 +79,7 @@ def generate_nodegroups(roster):
 
 
 def generate_dom0s(roster):
-    x = _generate(roster, "dom0")
+    x = _generate_tree(roster, "dom0")
     g = {"qubes": {"dom0s": {}}}
     gg = g["qubes"]["dom0s"]
     for key, val in x.items():
@@ -107,7 +107,7 @@ def generate_vms(roster):
 
 
 def generate_vm_templates(roster):
-    x = _generate(roster, "vm_template")
+    x = _generate_tree(roster, "vm_template")
     g = {"qubes": {"vm_templates": {}}}
     gg = g["qubes"]["vm_templates"]
     for key, val in x.items():
@@ -169,7 +169,7 @@ def check_roster(roster, dom0s, vm_templates, unused_vms):
                         "purple",
                         "yellow",
                         "gray",
-                    ]
+                    ], "VM label %r is not valid" % data["vm_label"]
             else:
                 assert "proxy" not in data, roster_item
             if "vm_template" in data:
