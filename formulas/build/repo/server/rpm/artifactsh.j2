@@ -12,6 +12,7 @@ mustbes = (
     ["rsync", "--server", "-logDtpre.iLsfxCIv"],
     ["rsync", "--server", "-logDtpre.iLsfxCIvu"],
     ["mirror"],
+    ["create"],
 )
 
 
@@ -42,6 +43,19 @@ repo = os.path.abspath({{ base_dir }})
 
 for mustbe in mustbes:
     if mustbe == cmd[:len(mustbe)]:
+        if mustbe == ["create"]:
+            arg = os.path.basename(cmd[-1])
+            for dest in [
+                os.path.abspath(os.path.join(repo, "unstable", arg, "repodata")),
+                os.path.abspath(os.path.join(repo, "unstable", arg, "packages")),
+            ]:
+                os.makedirs(dest, exist_ok=True)
+            syml = os.path.abspath(os.path.join(repo, arg))
+            tgt = os.path.abspath(os.path.join(repo, "unstable", arg))
+            if not os.path.exists(syml):
+                os.symlink(tgt, syml)
+            sys.exit(run(["bash", "-c", "createrepo_c %s >&2" % (shlex.quote(os.path.dirname(dest)),)]))
+
         if mustbe == ["mirror"]:
             sys.exit(run(["rsync", "-aHv", "--delete", "--", repo + "/", {{ mirror_host }} + ":"]))
 
