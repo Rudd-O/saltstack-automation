@@ -125,7 +125,7 @@ if rw_only_or_physical():
                     require=[ccd],
                     contents="""
 ifconfig-push {{ ip }} 255.255.255.255
-push "route {{ local_ip }} 255.255.255.255 {{ ip }} 0"
+push "route vpn_gateway 255.255.255.255 {{ ip }} 0"
 {%- for client_route in client_routes %}
 push "route {{ client_route }} {{ ip }} 0"
 {%- endfor %}

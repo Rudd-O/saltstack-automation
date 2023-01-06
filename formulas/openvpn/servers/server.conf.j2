@@ -23,6 +23,8 @@ cipher AES-256-GCM
 push "cipher AES-256-GCM"
 auth SHA256
 
+push "route-gateway {{ local_ip }}"
+
 {% for d in dns | default([]) %}
 push "dhcp-option DNS {{ d }}"
 {% endfor %}
