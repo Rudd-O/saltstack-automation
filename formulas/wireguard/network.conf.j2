@@ -10,7 +10,7 @@ PostUp = {%   for c in peers.values() %}ping -c1 {{ c.subnet.split("/")[0] }} ||
 # {{ name }}
 PublicKey = {{ c.pubkey }}
 AllowedIPs = {{ c.subnet }}
-{%-     if c.address %}
+{%-     if c.address|default(None) %}
 Endpoint = {{ c.address }}:{{ port }}
 {%-     endif %}
 {%-   endif %}
