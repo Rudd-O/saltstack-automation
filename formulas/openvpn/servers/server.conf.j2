@@ -1,0 +1,41 @@
+proto {{ proto | default("udp") }}
+
+{% if port | default(None) %}port {{ port }}{% endif %}
+
+dev-type tun
+dev {{ server }}
+
+ca {{ server }}/ca.crt
+cert {{ server }}/server.crt
+key {{ server }}/server.key
+dh {{ server}}/dh.pem
+client-config-dir {{ server }}/ccd
+
+mode server
+tls-server
+
+topology subnet
+push "topology subnet"
+
+script-security 2
+
+cipher AES-256-GCM
+push "cipher AES-256-GCM"
+auth SHA256
+
+{% for d in dns | default([]) %}
+push "dhcp-option DNS {{ d }}"
+{% endfor %}
+
+{% if ping | default("290") %}
+push "ping {{ ping | default("290") }}"
+{% endif %}
+{% if ping_restart | default("600") %}
+push "ping-restart {{ ping_restart | default("600") }}"
+{% endif %}
+
+ifconfig {{ local_ip }} 255.255.255.255
+
+{% for c in clients.values() %}
+up "/bin/bash -c '/sbin/ip route add {{ c.ip }} dev {{ server }}'"
+{% endfor %}

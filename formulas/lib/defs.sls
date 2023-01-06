@@ -23,14 +23,15 @@ class Perms(object):
 
 class Dotdict(dict):
     """dot.notation access to dictionary attributes"""
+
     def __getitem__(self, k):
         v = dict.__getitem__(self, k)
-        if isinstance(v, dict) and not isinstance(v, Dotdict):
+        if isinstance(v, dict) and not getattr(v, "_is_dotdict", False):
             self[k] = v
         elif isinstance(v, list):
             redo = False
             for n, elm in enumerate(v):
-                if isinstance(elm, dict) and not isinstance(elm, Dotdict):
+                if isinstance(elm, dict) and not getattr(v, "_is_dotdict", False):
                     redo = True
             if redo:
                 self[k] = v
@@ -41,13 +42,13 @@ class Dotdict(dict):
         return Dotdict(self.items())
 
     def __setitem__(self, k, v):
-        if isinstance(v, dict) and not isinstance(v, Dotdict):
+        if isinstance(v, dict) and not getattr(v, "_is_dotdict", False):
             v = Dotdict(v)
         if isinstance(v, list):
             new_ = []
             done = False
             for elm in v:
-                if isinstance(elm, dict) and not isinstance(v, Dotdict):
+                if isinstance(elm, dict) and not getattr(v, "_is_dotdict", False):
                     elm = Dotdict(elm)
                     done = True
                 new_.append(elm)
@@ -56,7 +57,9 @@ class Dotdict(dict):
         dict.__setitem__(self, k, v)
 
     def __getattribute__(self, attrname):
-        if attrname == "__getitem__":
+        if attrname == "_is_dotdict":
+            return True
+        elif attrname == "__getitem__":
             return lambda k: Dotdict.__getitem__(self, k)
         elif attrname == "__deepcopy__":
             return lambda k: Dotdict.__deepcopy__(self)
@@ -67,12 +70,20 @@ class Dotdict(dict):
         except KeyError as e:
             raise AttributeError(str(e))
 
+    def items(self):
+        res = []
+        for k, v in dict.items(self):
+            if isinstance(v, dict) and not getattr(v, "_is_dotdict", False):
+                v = Dotdict(v)
+            res.append((k, v))
+        return res
+
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
 
 
 def as_plain_dict(d):
-    if isinstance(d, Dotdict):
+    if isinstance(d, dict) and getattr(d, "_is_dotdict", False):
         items = list(d.items())
         for n, x in enumerate(items):
             k, v = x
@@ -95,6 +106,7 @@ def PillarConfigWithDefaults(pillar_key, defaults, merge_lists=False):
 
 
 def ShowConfig(pillar_config):
+    return
     pillar_config = as_plain_dict(pillar_config)
     return Test.nop("Configuration is:\n%s" % yaml.dump(pillar_config))
 

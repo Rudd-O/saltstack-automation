@@ -189,6 +189,8 @@ def _rule_to_iptables(
         elif k == "pkttype":
             parts.extend(["-m", "pkttype", "--pkt-type", v])
             del child_must_process[k]
+        elif k == "icmp_type":
+            parts.extend(["--icmp-type", v])
         elif k == "action":
             assert not seen_action, (rule, seen_action)
             assert v.upper() in [
