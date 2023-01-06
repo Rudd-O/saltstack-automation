@@ -1,15 +1,21 @@
 # OpenVPN formula
 
 This is a very simple formula to set up OpenVPN servers.
-The only supported mode is topology p2p with dev tun
-(layer 3).  Sorry, Windows users.
+The only supported mode is topology subnet with dev tun
+(layer 3).
 
 The server is expected to be connected to a LAN and routing
-clients to that LAN.  If the `local_ip` parameter on your
-OpenVPN server is part of the LAN subnet, then the machine
-should use proxy ARP to allow clients on both the VPN side
-and the LAN side to talk to each other.
+clients to that LAN.  The `local_ip` parameter may be an
+IP address that your OpenVPN server already is using.
+
+So long as the OpenVPN server is the default route on the
+other side of the network (the LAN), machines on the LAN
+LAN side know to talk to VPN clients via the OpenVPN server.
 
 ## Pillar reference
 
-To be done.
+
+You can control the client routes with the parameter
+`client_routes`.
+
+More to be documented.
