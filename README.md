@@ -16,6 +16,7 @@ Formulas are under [`formulas`](formulas/).  Here is an overview:
 * [Matrix](formulas/matrix/) helps you set up a self-contained federated Matrix Synapse instance with VoIP signaling support.  To learn more about how to use this formula, [see the guide](https://rudd-o.com/linux-and-free-software/matrix-in-a-box).
 * [Wireguard](formulas/wireguard/) sets up simple wg-quick Wireguard networks among multiple hosts.  You can set up more than one.  See the `README.md` file in that directory.
 * [Email](formulas/email) sets up various e-mail system components.
+* [Network block device encryption (Tang+Clevis)](formulas/nbde) sets up server and clients for network-based disk decryption on boot.  See the `README.md` file in that directory.
 
 ## SaltStack `bombshell-client` adapters for Qubes OS
 
