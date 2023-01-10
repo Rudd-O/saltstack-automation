@@ -101,3 +101,9 @@ for line in lines:
             require_in=key_absent,
             watch_in=[dracut],
         )
+    else:
+        Test.nop(
+            f"Device {dev} already paired with Tang server",
+            require=[p] + key,
+            require_in=key_absent + [dracut],
+        )
