@@ -136,7 +136,7 @@ def check_roster(roster, dom0s, vm_templates, unused_vms):
     for roster_item, data in roster.items():
         if "connection_type" in data or "vm_class" in data:
             if "." in roster_item:
-                assert data["vm_name"] == roster_item.split(".")[0], roster_item
+                assert data["vm_name"] == roster_item.split(".")[0], "%s does not match the VM name" % roster_item
                 assert "proxy" in data, roster_item
                 if "dom0" in data:
                     proxy = data["proxy"].replace(".dragonfear", "")
