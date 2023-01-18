@@ -106,7 +106,6 @@ def PillarConfigWithDefaults(pillar_key, defaults, merge_lists=False):
 
 
 def ShowConfig(pillar_config):
-    return
     pillar_config = as_plain_dict(pillar_config)
     return Test.nop("Configuration is:\n%s" % yaml.dump(pillar_config))
 
