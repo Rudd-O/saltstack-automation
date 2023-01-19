@@ -6,6 +6,7 @@ from salt://maint/config.sls import config
 
 
 dep = Test.nop("Before disabling units").requisite
+postdep = Test.nop("After disabling units").requisite
 
 for unit in config.distupgrade.get("units_to_stop"):
     qunit = quote(unit)
@@ -21,4 +22,5 @@ fi
 """,
         stateful=True,
         require=[dep],
+        require_in=[postdep],
     )

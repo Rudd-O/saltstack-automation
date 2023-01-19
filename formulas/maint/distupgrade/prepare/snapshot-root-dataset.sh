@@ -2,6 +2,9 @@
 
 set -e
 
+curr=$(cat /.distupgrade | head -1)
+next=$(cat /.distupgrade | tail -1)
+
 which zfs >/dev/null 2>&2 || {
     echo
     echo changed=no comment="'This machine has no ZFS.'"
@@ -14,7 +17,7 @@ rootdataset=$(zfs list / -H -o name) || {
     exit 0
 }
 
-sname="$rootdataset@distupgrade-from-$1-to-$2"
+sname="$rootdataset@distupgrade-from-$curr-to-$next"
 
 zfs list "$sname" -H -o name && {
     echo

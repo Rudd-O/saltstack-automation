@@ -1,6 +1,7 @@
 {% if salt['grains.get']("qubes:persistence") in ("full", "") %}
 
 include:
+- .marker
 - .debugoff
 - .selinuxenforcing
 - .units
@@ -10,14 +11,15 @@ Cleanup begun:
   - require_in:
     - service: Disable debug shell
     - cmd: setenforce 1
+    - test: Before enabling units
 
-Remove distupgrade marker:
-  file.absent:
-  - name: /.distupgrade
-  - require:
-    - service: Disable debug shell
-    - file: Set SELinux to enforcing
-    - test: After enabling units
+extend:
+  Remove distupgrade marker:
+    file:
+    - require:
+      - service: Disable debug shell
+      - file: Set SELinux to enforcing
+      - test: After enabling units
 
 Cleanup complete:
   test.nop:

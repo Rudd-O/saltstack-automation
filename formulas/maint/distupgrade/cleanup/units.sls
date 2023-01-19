@@ -6,6 +6,7 @@ from salt://maint/config.sls import config
 
 
 dep = Test.nop("After enabling units").requisite
+predep = Test.nop("Before enabling units").requisite
 
 for unit in config.distupgrade.get("units_to_stop"):
     qunit = quote(unit)
@@ -19,5 +20,6 @@ systemctl start {qunit} >&2
 echo changed=yes
 """,
         stateful=True,
+        require=[predep],
         require_in=[dep],
     )
