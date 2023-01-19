@@ -3,6 +3,7 @@
 include:
 - .debugoff
 - .selinuxenforcing
+- .units
 
 Cleanup begun:
   test.nop:
@@ -16,6 +17,7 @@ Remove distupgrade marker:
   - require:
     - service: Disable debug shell
     - file: Set SELinux to enforcing
+    - test: After enabling units
 
 Cleanup complete:
   test.nop:

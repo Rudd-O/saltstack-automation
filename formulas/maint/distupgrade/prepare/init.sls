@@ -4,6 +4,7 @@ include:
 - .debugon
 - .selinuxpermissive
 - .snapshot
+- .units
 
 extend:
   Snapshot root dataset:
@@ -11,6 +12,7 @@ extend:
     - require_in:
       - service: Enable debug shell
       - file: Set SELinux to permissive
+      - test: Before disabling units
 
 Preparation complete:
   test.nop:
