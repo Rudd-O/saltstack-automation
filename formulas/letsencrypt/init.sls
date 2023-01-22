@@ -15,9 +15,9 @@ if fully_persistent_or_physical():
     Pkg.installed("ca-certificates", require_in=[Pkg("certbot")])
     pk = Pkg.installed("policycoreutils").requisite
     with Pkg.installed("certbot"):
-        q = Qubes.enable_dom0_managed_service("certbot-renew", enable=False).requisite
-        Service.enabled("certbot-renew.timer", require=[q])
-    deps = [Qubes("certbot-renew"), Service("certbot-renew.timer"), pk]
+        q = Qubes.disable_dom0_managed_service("certbot-renew", disable=False).requisite
+        q2 = Qubes.enable_dom0_managed_service("certbot-renew.timer", qubes_service_name="certbot-renew", enable=True, require=[q]).requisite
+    deps = [q2, pk]
 else:
     deps = []
 

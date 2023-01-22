@@ -56,12 +56,19 @@ def collector(n, ext=None):
             **Perms.file,
         ).requisite
 
+        nonqubified = Qubes.disable_dom0_managed_service(
+            f"{n} disqubified",
+            name=n,
+            disable=False,
+            watch_in=[Cmd("Reload systemd for node exporter")],
+        ).requisite
         qubified = Qubes.enable_dom0_managed_service(
             f"{n} qubified",
-            name=n,
+            name=f"{n}.timer",
             qubes_service_name="node_exporter",
             enable=False,
-            require=[service],
+            watch_in=[Cmd("Reload systemd for node exporter")],
+            require=[service, nonqubified],
         ).requisite
 
         timer = File.managed(
@@ -74,6 +81,7 @@ def collector(n, ext=None):
 
         enabled = Service.enabled(
             f"{n}.timer",
+            qubes_service_name="node_exporter",
             require=[Cmd("Reload systemd for node exporter"), timer],
         ).requisite
 

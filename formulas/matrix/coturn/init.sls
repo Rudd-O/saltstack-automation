@@ -57,14 +57,20 @@ if fully_persistent_or_physical():
     deps.append(File("/etc/systemd/system/coturn.service.d/restart.conf"))
     restartwatch.append(File("/etc/systemd/system/coturn.service.d/restart.conf"))
 
-    Qubes.enable_dom0_managed_service(
+    dis = Qubes.disable_dom0_managed_service(
         "coturn-update-external-ip",
+        qubes_service_name="coturn-update-external-ip",
+        disable=False,
         watch_in=[Cmd("reload systemd")],
         require=[File("/etc/systemd/system/coturn-update-external-ip.service")],
-    )
-    deps.extend([
-       Qubes("coturn-update-external-ip"),
-    ])
+    ).requisite
+    dep = Qubes.enable_dom0_managed_service(
+        "coturn-update-external-ip.timer",
+        qubes_service_name="coturn-update-external-ip",
+        watch_in=[Cmd("reload systemd")],
+        require=[dis],
+    ).requisite
+    deps.append(dep)
 else:
     pass
 
