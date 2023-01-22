@@ -177,10 +177,18 @@ def enable_dom0_managed_service(
         # Nothing to do (not a Qubes OS TemplateVM).
         return ret1
 
+    types = [
+        "service", "timer", "socket", "device", "mount", "scope",
+        "automount", "swap", "target", "path", "slice",
+    ]
+    service_to_extend = (
+        name if any(name.endswith(".%s" %t) for t in types)
+        else name + ".service"
+    )
     ret2 = _single(
         "qubify service",
         "file.managed",
-        name="/etc/systemd/%s/%s.service.d/qubes.conf" % (scope, name),
+        name="/etc/systemd/%s/%s.d/qubes.conf" % (scope, service_to_extend),
         contents="""[Unit]
 ConditionPathExists=/var/run/qubes-service/%s
 """
@@ -189,6 +197,69 @@ ConditionPathExists=/var/run/qubes-service/%s
         group="root",
         mode="0644",
         makedirs=True,
+    )
+
+    if ret2["result"] is False:
+        return ret2
+
+    return _mimic(
+        ret,
+        {
+            "result": ret2["result"],
+            "comment": "\n".join([ret1["comment"], ret2["comment"]]),
+            "changes": dict(
+                (r["name"], r["changes"]) for r in [ret1, ret2] if r["changes"]
+            ),
+        },
+    )
+
+
+def disable_dom0_managed_service(
+    name, scope="system", qubes_service_name=None, disable=False
+):
+    """
+    Remove mark of a systemd service as managed by Qubes OS.
+
+    See https://dev.qubes-os.org/projects/core-admin-client/en/latest/manpages/qvm-service.html
+    for more information.
+    """
+    if qubes_service_name is None:
+        qubes_service_name = name
+    if scope != "system":
+        raise NotImplementedError("The scope %r is not implemented yet" % scope)
+
+    ret = dict(name=name, result=False, changes={}, comment="")
+
+    if disable:
+        ret1 = _single(
+            "disable service",
+            "service.disabled",
+            name=name,
+        )
+
+        if ret1["result"] is False:
+            return ret1
+    else:
+        ret1 = dict(
+            name=name, result=True, changes={}, comment="Service explicitly not disabled"
+        )
+
+    if __salt__["grains.get"]("qubes:vm_type", "").lower() != "TemplateVM".lower():
+        # Nothing to do (not a Qubes OS TemplateVM).
+        return ret1
+
+    types = [
+        "service", "timer", "socket", "device", "mount", "scope",
+        "automount", "swap", "target", "path", "slice",
+    ]
+    service_to_extend = (
+        name if any(name.endswith(".%s" %t) for t in types)
+        else name + ".service"
+    )
+    ret2 = _single(
+        "qubify service",
+        "file.absent",
+        name="/etc/systemd/%s/%s.d/qubes.conf" % (scope, service_to_extend),
     )
 
     if ret2["result"] is False:
