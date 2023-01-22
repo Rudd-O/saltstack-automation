@@ -29,14 +29,12 @@
 {%   set listen_addr = None %}
 {% endif %}
 
-{#
-Debug:
+Debug Varnish configuration:
   test.nop:
   - name: |
-      {{ stevedores | json }}
-      {{ opts | json }}
-      {{ listen_addr | json }}
-#}
+      Stevedores: {{ stevedores | json }}
+      Opts: {{ opts | json }}
+      Listen addr: {{ listen_addr | json }}
 
 include:
 - .set_backend
@@ -97,7 +95,14 @@ reload varnish:
   - contents: |
       [Service]
       ExecStart=
-      ExecStart=/usr/sbin/varnishd -a {{ listen_addr }} -f /etc/varnish/default.vcl {{ opts }}
+      ExecStart=/usr/sbin/varnishd \
+                -a {{ listen_addr }} \
+                -f /etc/varnish/default.vcl \
+                {%- if grains.osmajorrelease | int >= 37 %}
+                -P %t/%N/varnishd.pid \
+                {%- endif %}
+                -p feature=+http2 \
+                {{ opts }}
   - makedirs: true
 {% else %}
   file.absent:
