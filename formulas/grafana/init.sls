@@ -1,6 +1,6 @@
 #!pyobjects
 
-from salt://lib/qubes.sls import Qubify, dom0, fully_persistent_or_physical, rw_only_or_physical
+from salt://lib/qubes.sls import dom0, fully_persistent_or_physical, rw_only_or_physical
 from salt://lib/defs.sls import Perms
 from salt://grafana/config.sls import config
 

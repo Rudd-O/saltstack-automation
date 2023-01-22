@@ -257,7 +257,7 @@ def disable_dom0_managed_service(
         else name + ".service"
     )
     ret2 = _single(
-        "qubify service",
+        "unqubify service",
         "file.absent",
         name="/etc/systemd/%s/%s.d/qubes.conf" % (scope, service_to_extend),
     )
