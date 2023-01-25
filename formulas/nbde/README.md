@@ -80,18 +80,18 @@ its respective keyfile.
 
 ### What the formula does for non-Tang+Clevis devices
 
-Here isa tip on what to do about each device in question:
+Here is a tip on what to do about each device in question:
 
-1. Add path `/etc/cryptsetup-keys.d/<fn>.key` to each one
-   of these non-boot devices in `/etc/crypttab`.
+1. Looks up the keyfile (normally `/etc/cryptsetup-keys.d/<n>.key`)
+   for each one of your non-boot devices listed in `/etc/crypttab`.
 2. Perform the following routine:
 
 ```
-fn=<fn>
 device=/dev/<device>
-mkdir -m 700 /etc/cryptsetup-keys.d
-dd if=/dev/random of=/etc/cryptsetup-keys.d/$fn.key bs=32 count=1
-chmod 600 /etc/cryptsetup-keys.d/$fn.key
-cryptsetup luksAddKey $device /etc/cryptsetup-keys.d/$fn.key
-# now input an existing recovery passphrase
+mkdir -m 700 $(dirname $keyfile)
+dd if=/dev/random of=$keyfile bs=32 count=1
+chmod 600 $keyfile
+cryptsetup luksAddKey $device $keyfile
+# that was a simplified sample — the existing recovery passphrase
+# is also used in the command above
 ```
