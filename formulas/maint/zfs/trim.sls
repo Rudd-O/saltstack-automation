@@ -11,7 +11,7 @@ if fully_persistent_or_physical() or dom0():
 set -e
 changed=no
 for pool in $(zpool list -o name -H) ; do
-    echo -n "$pool" >&2
+    echo -n "$pool: " >&2
     zpool trim "$pool" && echo trimming >&2 || /bin/true
 done
 """,
