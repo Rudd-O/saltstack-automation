@@ -221,6 +221,22 @@ scrape_configs:
       replacement: zope_connection_${2}
 {%- endif %}
 
+{%- if scraper.startswith("node") %}
+    metric_relabel_configs:
+    # Do not ingest non-failed metrics.
+    - source_labels: [__name__, state]
+      regex: "systemd_unit_state;(active|inactive)"
+      action: drop
+    # Do not ingest non-remote sessions.
+    - source_labels: [__name__, remote]
+      regex: "node_logind_sessions;false"
+      action: drop
+    # Do not ingest sessions with seats.
+    - source_labels: [__name__, seat]
+      regex: "node_logind_sessions;seat.+"
+      action: drop
+{%- endif %}
+
 {%- if scraper.startswith("ebpf") %}
     metric_relabel_configs:
     -
