@@ -12,11 +12,11 @@ svcs.append('prometheus')
 
 
 if fully_persistent_or_physical() and not dom0():
-    include('build.repo.client')
+    include('build.repo.client.rpm')
     with Pkg.latest(
         "prometheus-packages",
         pkgs=pkgs,
-        require=[Test('repo deployed')],
+        require=[Test('RPM repo deployed')],
     ):
         for svc in svcs:
             Qubes.enable_dom0_managed_service(
