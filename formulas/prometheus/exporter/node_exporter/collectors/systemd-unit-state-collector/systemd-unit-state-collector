@@ -40,7 +40,7 @@ def iter():
     in_ = subprocess.run(
         "systemctl show * -p Id,ActiveState,SubState".split(),
         capture_output=True,
-        check=True,
+        check=False,
         universal_newlines=True
     ).stdout
 
@@ -74,8 +74,8 @@ def iter():
             if not self.flushed:
                 print("# HELP systemd_unit_state Tracks the state of a systemd unit.", file=self.out)
                 self.flushed = True
-            out.write("systemd_unit_state{")
-            out.write(",".join(
+            self.out.write("systemd_unit_state{")
+            self.out.write(",".join(
                 k + "=" + '"' + unescape(v) + '"'
                 for k, v in sorted(self.unit.items())
             ))
@@ -92,8 +92,10 @@ def iter():
             else:
                 u.unitflush()
         end = time.time()
-        out.write("systemd_unit_state_collector_start_time_seconds %s\n" % start)
-        out.write("systemd_unit_state_collector_end_time_seconds %s\n" % end)
+        print("# HELP systemd_unit_state_collector_start_time_seconds Tracks the start of the collector run.", file=out)
+        print("systemd_unit_state_collector_start_time_seconds %s" % start, file=out)
+        print("# HELP systemd_unit_state_collector_end_time_seconds Tracks the end of the collector run.", file=out)
+        print("systemd_unit_state_collector_end_time_seconds %s" % end, file=out)
 
 
 while True:
