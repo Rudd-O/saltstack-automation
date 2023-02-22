@@ -34,6 +34,7 @@ defaults = {
         "restart_exclude_paths": default_exclude_paths,
         "restart_exclude_services": default_exclude_services,
     },
+    "distupgrade": {},
 }
 
 config = PillarConfigWithDefaults("maint", defaults, merge_lists=True)

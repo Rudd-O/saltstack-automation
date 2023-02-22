@@ -8,7 +8,7 @@ from salt://maint/config.sls import config
 dep = Test.nop("After enabling units").requisite
 predep = Test.nop("Before enabling units").requisite
 
-for unit in config.distupgrade.get("units_to_stop"):
+for unit in config.distupgrade.get("units_to_stop", []):
     qunit = quote(unit)
     Cmd.run(
         "Enable unit %s" % unit,
