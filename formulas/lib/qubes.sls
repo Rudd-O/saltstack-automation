@@ -41,8 +41,10 @@ def rw_only():
     return grains('qubes:persistence') in ('rw-only',)
 
 
-def RpcPolicy(name, contents):
+def OldRpcPolicy(name, contents=None):
     n = "/etc/qubes-rpc/policy/" + name
+    if not contents:
+        return File.absent(n).requisite
     return File.managed(
         n,
         contents=contents,
@@ -50,3 +52,18 @@ def RpcPolicy(name, contents):
         group="qubes",
         **Perms.dir
     ).requisite
+
+def NewRpcPolicy(name, contents, **kwargs):
+    if not contents:
+        return File.absent(
+            f"/etc/qubes/policy.d/{name}.policy",
+            **kwargs,
+        )
+    return File.managed(
+        f"/etc/qubes/policy.d/{name}.policy",
+        contents=contents,
+        mode="0664",
+        user="root",
+        group="qubes",
+        **kwargs,
+    )
