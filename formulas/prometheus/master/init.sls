@@ -3,6 +3,7 @@
 from salt://lib/qubes.sls import dom0, fully_persistent_or_physical, rw_only_or_physical
 from salt://lib/defs.sls import Perms
 from salt://prometheus/config.sls import config
+from salt://build/repo/client/lib.sls import rpm_repo
 
 
 pkgs = ["prometheus2", "alertmanager"]
@@ -12,11 +13,10 @@ svcs.append('prometheus')
 
 
 if fully_persistent_or_physical() and not dom0():
-    include('build.repo.client.rpm')
     with Pkg.latest(
         "prometheus-packages",
         pkgs=pkgs,
-        require=[Test('RPM repo deployed')],
+        require=[rpm_repo()],
     ):
         for svc in svcs:
             Qubes.enable_dom0_managed_service(

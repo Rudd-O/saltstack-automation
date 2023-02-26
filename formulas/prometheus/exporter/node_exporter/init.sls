@@ -2,6 +2,7 @@
 
 from salt://lib/qubes.sls import updateable, template, physical
 from salt://prometheus/exporter/node_exporter/config.sls import config
+from salt://build/repo/client/lib.sls import rpm_repo
 
 
 include(sls + ".systemd")
@@ -15,13 +16,12 @@ include(sls + ".collectors")
 tmpfiles_created = Test("Collector directory created")
 
 if updateable():
-    include("build.repo.client.rpm")
     textfile_directory = config.paths.textfile_directory
 
     p = Mypkg.installed(
         f"{name}-pkg",
         name=name,
-        require=[Test("RPM repo deployed")],
+        require=[rpm_repo()],
         require_in=[] if template() else [File(textfile_directory)],
     ).requisite
 

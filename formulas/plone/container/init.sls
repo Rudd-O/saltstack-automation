@@ -7,13 +7,10 @@ from shlex import quote
 from pprint import pformat
 
 from salt://lib/qubes.sls import template
+from salt://build/repo/client/lib.sls import docker_repo
 
 
 include("plone.content_cache.set_backend")
-
-if pillar("build:repo:client", ""):
-    include("build.repo.client")
-
 
 context = pillar(sls.replace(".", ":"), {})
 data_basedir = context.get("directories", {}).get("datadir", "/srv/plone")
@@ -34,7 +31,7 @@ def reqs():
 
     Test.nop(
         "system requirements",
-        require=[Test("repo deployed")] if pillar("build:repo:client", "") else [],
+        require=[docker_repo()] if pillar("build:repo:client", "") else [],
     )
 
     Pkg.installed(
