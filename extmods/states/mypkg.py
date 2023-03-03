@@ -74,7 +74,7 @@ def installed(name, pkgs=None, version=None):
             missing = [pkgs[0] + "-" + version]
 
         p = subprocess.Popen(
-            ["qubes-dom0-update", "-y"] + missing,
+            ["qubes-dom0-update", "--console", "--show-output", "-y"] + missing,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
@@ -128,7 +128,7 @@ def _dom0_uptodate(name):
     ret = _single(
         name,
         "cmd.run",
-        name="qubes-dom0-update -y",
+        name="qubes-dom0-update --console --show-output -y",
     )
     ret["comment"] = (
         ret["comment"]
