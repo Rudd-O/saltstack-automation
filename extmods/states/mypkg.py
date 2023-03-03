@@ -151,3 +151,56 @@ def uptodate(name):
         return _dom0_uptodate(name)
     else:
         return __states__["pkg.uptodate"](name=name)
+
+
+def removed(name, pkgs=None):
+    if os.access("/usr/bin/qubes-dom0-update", os.X_OK):
+        before = _rpmlist()
+        pkgs = pkgs or [name]
+        if __opts__["test"]:
+            removed = list([p for p in pkgs if p in set(before)])
+            return {
+                "name": name,
+                "changes": {"removed": removed} if removed else {},
+                "result": None,
+                "comment": "",
+            }
+        p = subprocess.Popen(
+            ["dnf", "remove", "-y"] + pkgs,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+        )
+        stdout, stderr = p.communicate()
+        r = p.wait()
+        if r != 0:
+            return {
+                "name": name,
+                "changes": {},
+                "result": False,
+                "retcode": r,
+                "comment": (
+                    "Command failed with status code %s." % r
+                    + "\nStdout:\n%s" % stdout
+                    + "\nStderr:\n%s" % stderr
+                ),
+                "stdout": stdout,
+                "stderr": stderr,
+            }
+        else:
+            after = _rpmlist()
+            res = collections.OrderedDict()
+            removed = list(sorted(set(before) - set(after)))
+            if removed:
+                res["removed"] = removed
+            return {
+                "name": name,
+                "changes": res,
+                "retcode": r,
+                "result": True,
+                "comment": ("Stdout:\n%s" % stdout + "\nStderr:\n%s" % stderr),
+                "stdout": stdout,
+                "stderr": stderr,
+            }
+    else:
+        return __states__["pkg.removed"](name=name, pkgs=pkgs)
