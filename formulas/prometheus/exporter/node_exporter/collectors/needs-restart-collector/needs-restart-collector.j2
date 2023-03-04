@@ -5,7 +5,6 @@ start=$(date +%s.%N)
 services=$(
     (
       needs-restart -b {% for p in exclude_paths %} -i {{ p|quote }}{% endfor %} {% if exclude_services %} | grep -E -v {{ "|".join(exclude_services)|quote }} {% endif %} || true
-      needs-restart -b {% for p in exclude_paths %} -i {{ p|quote }}{% endfor %} | grep ^init.scope$ || true
     )
 )
 move=0
