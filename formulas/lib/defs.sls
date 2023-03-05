@@ -187,3 +187,10 @@ def KnownHostForUser(id_, host, known_host_keys, **kwargs):
                 )
     return before.requisite, after.requisite
 
+def ReloadSystemdOnchanges(sls_name):
+    # Returns the requisite directly.
+    return Cmd.wait(
+        f"reload systemd for {sls_name}",
+        name="systemctl --system daemon-reload",
+        onchanges=[],
+    ).requisite
