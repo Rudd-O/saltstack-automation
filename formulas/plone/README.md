@@ -80,7 +80,8 @@ Contains a dictionary with various defaults:
 
 * `green_listen_addr_prefix` / `blue_listen_addr_prefix`, the
   first three octets of a local IP address where the blue / green
-  deployments should listen (the fourth is computed based on order).
+  deployments should listen (the fourth is computed based on order,
+  so if you reorder your containers they will all be relaunched).
 * `directories`: a set of paths that decode where the data is placed
   (only `datadir` is supported).
 * `backend_processes`: default count of backend processes that
@@ -106,15 +107,37 @@ supported settings are:
 * `backend_processes`: defines a custom backend process count
   for this deployment, overriding the default `backend_processes`
   for all deployments.
+* `green_listen_addr_prefix` / `blue_listen_addr_prefix`, the
+  first three octets of a local IP address where the blue / green
+  deployments should listen (the fourth is computed based on order,
+  so if you reorder your containers they willall be relaunched).
+  This overrides the `plone:container`-defined defaults.
+* `green_listen_addr` / `blue_listen_addr`, local IP addresses
+  where the blue / green deployments will listen, respectively.
+  This overrides `green/blue_listen_addr_prefix`.
 
 All deployments are accessible directly under URL
 `https://<any server hostname>/deployments/<deployment name>`.
 
 The first deployment listed will always be the default deployment.
 
+In general changing these settings will cause the containers to
+be recreated from scratch (but preserving the data).  The process
+goes like this:
+
+* blue is recreated, pointing to a copy of the data of green
+* blue is made the default backend for this deployment
+* green is recreated, preserving its data
+* green is made the default backend for this deployment
+* blue is stopped
+
+When a deployment is reordered above or below another, if its
+`green_listen_addr` and `blue_listen_addr` aren't defined, then
+the automation will recreate the containers (both blue and green)
+due to the default values for these addresses changing.
+
 See beginning of document for default manager user name and password
 on freshly-created sites.
-
 
 ### `plone:container:backend_processes` pillar
 

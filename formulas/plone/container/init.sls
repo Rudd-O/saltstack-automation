@@ -112,7 +112,7 @@ mkdir -p %(destination)s
 rsync -a --delete --inplace %(source)s/filestorage/ %(destination)s/filestorage/
 rm -rf %(destination)s/blobstorage
 cp -a --reflink=auto %(source)s/blobstorage %(destination)s/blobstorage
-chown -R root.root %(destination)s
+chown -R root:root %(destination)s
 chmod 755 %(destination)s %(destination)s/blobstorage %(destination)s/filestorage
 if [ "$context" != "" ] ; then
     chcon -R "$context" %(destination)s/blobstorage %(destination)s/filestorage
@@ -234,8 +234,8 @@ def deploy(i, n, processes, data, require=None):
     nc_green = f"plone-{n}-green"
     blue_datadir = datadir + "-blue"
     green_datadir = datadir + "-green"
-    blue_listen_addr = blue_listen_addr_prefix + str(i * 2 + 1)
-    green_listen_addr = green_listen_addr_prefix + str(i * 2 + 2)
+    blue_listen_addr = data.get("blue_listen_addr", blue_listen_addr_prefix + str(i * 2 + 1))
+    green_listen_addr = data.get("green_listen_addr", green_listen_addr_prefix + str(i * 2 + 2))
 
     green_pod_options, green_pod_containers, green_addresses = make_containers(nc_green, green_datadir, green_listen_addr, processes)
     blue_pod_options, blue_pod_containers, blue_addresses = make_containers(nc_blue, blue_datadir, blue_listen_addr, processes)
