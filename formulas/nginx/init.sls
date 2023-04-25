@@ -10,7 +10,6 @@ if fully_persistent_or_physical():
             "/etc/systemd/system/nginx.service.d/ulimits.conf",
             contents="""[Service]
 LimitNOFILE=1048576
-LimitNOFILESoft=1048576
 """,
             makedirs=True,
         ).requisite
