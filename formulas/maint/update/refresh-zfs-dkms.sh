@@ -22,7 +22,6 @@ which dkms >/dev/null 2>&1 || {
   exit 0
 }
 
-created_initramfses=
 changed=no
 for kver in $(rpm -q kernel --queryformat="%{version}-%{release}.%{arch}\n")
 do
@@ -45,38 +44,16 @@ do
             $cmd dkms uninstall -k "$kver" zfs/"$zfsver" >&2 || echo "no need to uninstall" >&2
             $cmd dkms remove -k "$kver" zfs/"$zfsver" >&2 || echo "no need to remove" >&2
             $cmd dkms install -k "$kver" zfs/"$zfsver" >&2
+            $cmd dracut -f --kver "$kver" >&2
             if test -f /boot/initramfs-"$kver".img ; then
-                $cmd cp -f /boot/initramfs-"$kver".img /boot/initramfs-"$kver".img.knowngood >&2
                 if test -f /boot/efi/EFI/*/initramfs-"$kver".img ; then
                     $cmd cp -f /boot/initramfs-"$kver".img /boot/efi/EFI/*/initramfs-"$kver".img >&2
                 fi
             fi
-            $cmd dracut -f --kver "$kver" >&2
             changed=yes
         fi
-        created_initramfses="$created_initramfses /boot/initramfs-$kver.img.knowngood" >&2
     fi
 done
-
-if [ "$check" != "true" ] ; then
-    for initramfs in /boot/initramfs-*img.knowngood
-    do
-        found=false
-        for created_initramfs in $created_initramfses
-        do
-            if [ "$initramfs" == "$created_initramfs" ]
-            then
-                found=true
-            fi
-        done
-        if [ "$found" == "false" -a -f "$initramfs" ]
-        then
-            echo "=== Removing obsolete initial RAM disk $initramfs ===" >&2
-            $cmd rm -f "$initramfs" >&2
-            changed=yes
-        fi
-    done
-fi
 
 echo
 echo changed=$changed
