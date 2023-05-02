@@ -1,9 +1,11 @@
 #!/bin/bash
 
-set -xe
+set -e
 
 curr=$(cat /.distupgrade | head -1)
 next=$(cat /.distupgrade | tail -1)
+
+echo "This system has OS release $curr and will be upgraded to OS release $next" >&2
 
 changed=yes
 ret=0
