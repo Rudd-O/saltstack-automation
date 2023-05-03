@@ -30,3 +30,9 @@ nextcloud:
   # More domains are optionally possible too.
   - cloud.dragonfear
 ```
+
+## Known issues
+
+* Running the OCC command to change settings, or making administrative settings
+  changes in the UI, causes some settings which this formula sets up to be
+  erased.  I'm working on a solution to this issue.
