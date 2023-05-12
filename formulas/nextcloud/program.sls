@@ -9,7 +9,8 @@ if fully_persistent_or_physical():
     with Pkg.installed("nextcloud", pkgs=["nextcloud", "libreoffice-core"]):
         q1 = Qubes.enable_dom0_managed_service("httpd.socket", qubes_service_name="httpd").requisite
         q2 = Qubes.enable_dom0_managed_service("nextcloud-cron.timer", qubes_service_name="nextcloud-cron").requisite
-    deps = [q1, q2]
+        q3 = Qubes.enable_dom0_managed_service("php-fpm", qubes_service_name="php-fpm").requisite
+    deps = [q1, q2, q3]
 else:
     deps = []
 
