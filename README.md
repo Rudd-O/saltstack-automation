@@ -17,6 +17,7 @@ Formulas are under [`formulas`](formulas/).  Here is an overview:
 * [Wireguard](formulas/wireguard/) sets up simple wg-quick Wireguard networks among multiple hosts.  You can set up more than one.  See the `README.md` file in that directory.
 * [Email](formulas/email) sets up various e-mail system components.
 * [Network block device encryption (Tang+Clevis)](formulas/nbde) sets up server and clients for network-based disk decryption on boot.  See the `README.md` file in that directory.
+* [Nextcloud](formulas/nextcloud) sets up a Nextcloud instance.  See the `README.md` file in that directory.
 
 ## SaltStack `bombshell-client` adapters for Qubes OS
 
