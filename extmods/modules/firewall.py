@@ -21,13 +21,14 @@ def unique(l):
 
 def resolve_nodegroup(host_or_network, nodegroups):
     path = host_or_network.split(":")
+    original_path = path[:]
     while path:
         try:
             nodegroups = nodegroups[path[0]]
         except KeyError:
             raise KeyError("no such nodegroup %s" % path[0])
         path = path[1:]
-    assert isinstance(nodegroups, list), (host_or_network, nodegroups)
+    assert isinstance(nodegroups, list), (host_or_network, original_path, nodegroups)
     return nodegroups
 
 
@@ -63,7 +64,7 @@ def resolve(host_or_network, homenetwork, nodegroups):
             addrs.extend(resolve(x, homenetwork, nodegroups))
         addrs, (host_or_network, addrs)
         return addrs
-    if host_or_network == "me":
+    if host_or_network in ("me", "self@"):
         addrs = []
         for addrgrp in __salt__["grains.get"]("ip4_interfaces").values():
             for addr in addrgrp:
@@ -329,4 +330,7 @@ def rule_to_iptables(
     default_chain=None,
 ):
     rule = _inherit_tree(rule)
-    return _rule_to_iptables(group_name, rule, homenetwork, nodegroups, default_chain)
+    try:
+        return _rule_to_iptables(group_name, rule, homenetwork, nodegroups, default_chain)
+    except AssertionError as exc:
+        raise Exception("Cannot process rule %s" % rule) from exc
