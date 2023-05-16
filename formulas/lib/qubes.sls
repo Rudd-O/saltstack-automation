@@ -8,6 +8,8 @@ except ImportError:
     from pipes import quote
 
 
+# FIXME replace all these ugly functions with a Python object called Me
+# or I, tht way I can say stuff like I.am.dom0.
 def dom0():
     return grains('qubes:vm_type') == "AdminVM"
 

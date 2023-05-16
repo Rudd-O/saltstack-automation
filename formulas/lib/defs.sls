@@ -129,6 +129,7 @@ def SystemUser(id_, shell=None, **kwargs):
     return u
 
 
+# Deprecate me with the state SshKeypair.present.
 def SSHKeyForUser(id_, key, key_name="id_rsa", key_path=".ssh", **kwargs):
     if key_path.startswith(os.path.pathsep):
         pass
@@ -148,7 +149,14 @@ def SSHKeyForUser(id_, key, key_name="id_rsa", key_path=".ssh", **kwargs):
 
 
 def SSHAccessToUser(id_, authorized_keys, **kwargs):
-    opts = ["no-agent-forwarding", "no-port-forwarding"]
+    # FIXME redeploy me everywhere I am used.
+    opts = [
+        "no-agent-forwarding",
+        "no-port-forwarding",
+        "no-X11-forwarding",
+        "no-pty",
+        "restrict",
+    ]
     if "options" in kwargs:
         for opt in kwargs["options"]:
             if opt not in opts:
@@ -163,6 +171,9 @@ def SSHAccessToUser(id_, authorized_keys, **kwargs):
     ).requisite
 
 
+# FIXME this usually should add both the FQDN and the IP address key for the host keys
+# so it should be a double loop, simplifying the callers.
+# FIXME: also port to a module instead of a string of tasks.
 def KnownHostForUser(id_, host, known_host_keys, **kwargs):
     try:
         host = host.split("@")[-1].split(":")[0]
