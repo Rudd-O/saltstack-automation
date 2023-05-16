@@ -1,6 +1,7 @@
 import collections
 import os
 import re
+import shlex
 import subprocess
 import sys
 
@@ -124,11 +125,14 @@ def installed(name, pkgs=None, version=None):
         return __states__["pkg.installed"](name=name, pkgs=pkgs)
 
 
-def _dom0_uptodate(name):
+def _dom0_uptodate(name, pkgs=None):
+    cmd = "qubes-dom0-update --console --show-output -y"
+    if pkgs:
+        cmd = cmd + " --action=update " + " ".join(shlex.quote(pkg) for pkg in pkgs)
     ret = _single(
         name,
         "cmd.run",
-        name="qubes-dom0-update --console --show-output -y",
+        name=cmd,
     )
     ret["comment"] = (
         ret["comment"]
@@ -146,11 +150,11 @@ def _dom0_uptodate(name):
     return ret
 
 
-def uptodate(name):
+def uptodate(name, pkgs=None):
     if os.access("/usr/bin/qubes-dom0-update", os.X_OK):
-        return _dom0_uptodate(name)
+        return _dom0_uptodate(name, pkgs)
     else:
-        return __states__["pkg.uptodate"](name=name)
+        return __states__["pkg.uptodate"](name=name, pkgs=pkgs)
 
 
 def removed(name, pkgs=None):
