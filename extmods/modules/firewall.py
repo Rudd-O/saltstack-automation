@@ -1,6 +1,6 @@
-from __future__ import print_function
-
 import collections
+import itertools
+import pprint
 import re
 import shlex
 
@@ -98,30 +98,20 @@ def resolve(host_or_network, homenetwork, nodegroups):
         return [homenetwork["unsalted"][host_or_network]["ip"]]
     except KeyError:
         pass
-    addrs = []
-    for iface, ifacedata in homenetwork["zips"][host_or_network].items():
-        addrs.append(ifacedata["addr"])
+    try:
+        addrs = []
+        for iface, ifacedata in homenetwork["zips"][host_or_network].items():
+            addrs.append(ifacedata["addr"])
+        assert addrs, (host_or_network, addrs)
+        return addrs
+    except KeyError:
+        pass
+    addrs = __salt__["dnsutil.A"](host_or_network)
     assert addrs, (host_or_network, addrs)
     return addrs
 
 
-def _inherit_tree(rule):
-    for subrule in rule.get("rules", []):
-        for k, v in list(rule.items()):
-            if k == "rules":
-                continue
-            if k not in subrule:
-                subrule[k] = v
-        _inherit_tree(subrule)
-    if "rules" in rule:
-        for k in list(rule.keys()):
-            if k != "rules":
-                del rule[k]
-    return rule
-
-
-def _rule_to_iptables(
-    group_name,
+def _transform_simple_rule_to_iptables(
     rule,
     homenetwork,
     nodegroups,
@@ -133,22 +123,9 @@ def _rule_to_iptables(
     dests = []
 
     ignore = set()
-    child_rules = []
     seen_action = False
 
     for k, v in list(rule.items()):
-        if k == "rules":
-            for rule in v:
-                child_rules.extend(
-                    rule_to_iptables(
-                        group_name,
-                        rule,
-                        homenetwork,
-                        nodegroups,
-                        default_chain,
-                    )
-                )
-            break
         if k == "raw":
             parts.extend(shlex.split(v))
             seen_action = True
@@ -288,10 +265,7 @@ def _rule_to_iptables(
         elif k == "chain":
             default_chain = v
         elif k not in ignore:
-            assert 0, (group_name, k, v, "unknown stanza %s" % k)
-
-    if child_rules:
-        return child_rules
+            assert 0, (k, v, "unknown stanza %s" % k)
 
     srcs = srcs or [[]]
     dests = dests or [[]]
@@ -313,24 +287,105 @@ def _rule_to_iptables(
                             "-m",
                             "comment",
                             "--comment",
-                            group_name
-                            + (": " + rule["comment"] if "comment" in rule else ""),
-                        ]
+                            rule["comment"],
+                        ] if "comment" in rule else []
                     )
     for n, rule in enumerate(rules[:]):
         rules[n] = " ".join(quote(str(x)) for x in rule)
     return unique(rules)
 
 
+
+def complex_rule_to_simple_rules(
+    rule,
+    homenetwork,
+    nodegroups,
+    default_chain=None,
+    level=0,
+):
+    def add(adict, origin, k, v):
+        if k == "comment" and "comment" in adict:
+            v = "%s: %s" % (adict["comment"], v)
+        else:
+            assert k not in adict, f"stanza {k} in {pprint.pformat(origin)} would overwrite a preexisting value in {pprint.pformat(adict)}"
+        adict[k] = v
+
+    if isinstance(rule, dict):
+        children = [collections.OrderedDict()]
+        for k1, v1 in rule.items():
+            if k1 in ("combine", "rules"):
+                if k1 == "rules":
+                    combine = [rule[k1]]
+                else:
+                    combine = rule[k1]
+                combined_tuples = [
+                    x for x in itertools.product(*combine)
+                ]
+                new_rules = []
+                for tupl in combined_tuples:
+                    newrule = {}
+                    for inner_dict in tupl:
+                        for k, v in inner_dict.items():
+                            add(newrule, inner_dict, k, v)
+                    new_rules.append(newrule)
+                child_stanzas_list = []
+                for new_rule in new_rules:
+                    child_stanzas_list.extend(complex_rule_to_simple_rules(new_rule, homenetwork, nodegroups, default_chain, level+1))
+                new_children = []
+                for child in children:
+                    for child_stanzas in child_stanzas_list:
+                        new_child = collections.OrderedDict(child)
+                        for k, v in child_stanzas.items():
+                            add(new_child, child_stanzas, k, v)
+                        new_children.append(new_child)
+                children = new_children
+            else:
+                for a in children:
+                    add(a, rule, k1, v1)
+
+    else:
+        assert 0, (type(rule), rule)
+    return children
+
+
 def rule_to_iptables(
-    group_name,
     rule,
     homenetwork,
     nodegroups,
     default_chain=None,
 ):
-    rule = _inherit_tree(rule)
     try:
-        return _rule_to_iptables(group_name, rule, homenetwork, nodegroups, default_chain)
-    except AssertionError as exc:
+        res = complex_rule_to_simple_rules(rule, homenetwork, nodegroups, default_chain)
+        res = [x for r in res for x in _transform_simple_rule_to_iptables(r, homenetwork, nodegroups, default_chain)]
+        return res
+    except (AssertionError, KeyError) as exc:
         raise Exception("Cannot process rule %s" % rule) from exc
+
+
+def ruleset_to_iptables(
+    ruleset,
+    homenetwork,
+    nodegroups,
+    default_chain=None,
+):
+    if isinstance(ruleset, dict):
+        r = []
+        for k, v in ruleset.items():
+            for v2 in v:
+                if "comment" in v2:
+                    v2["comment"] = "%s: %s" % (k, v2["comment"])
+                else:
+                    v3 = collections.OrderedDict()
+                    v3["comment"] = k
+                    try:
+                        v3.update(v2)
+                    except ValueError:
+                        raise ValueError(f"rule {pprint.pformat(v2)} is not well-formed")
+                    v2 = v3
+                r.append(v2)
+        ruleset = r
+    rules = []
+    for rulegroup in ruleset:
+        for rule in rule_to_iptables(rulegroup, homenetwork, nodegroups, default_chain):
+            rules.append(rule)
+    return rules
