@@ -263,3 +263,7 @@ A list of domains to skip SPF checks for, based on DNS PTR record match.  Empty 
 
 See file [spf/policyd-spf.conf.j2] and documentation for python-policyd-spf for information.
 
+### `suppress_unresolvable_hostname_warning_logs`
+
+Tells systemd to drop logs from Postfix about unresolvable host names.
+The default is to permit those logs as Postfix ships from the distributor.

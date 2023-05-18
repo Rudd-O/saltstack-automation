@@ -29,6 +29,7 @@ defaults = {
             "TempError_Defer": "False",
             "skip_addresses": "127.0.0.0/8,::ffff:127.0.0.0/104,::1".split(","),
         },
+        "suppress_unresolvable_hostname_warning_logs": False,
     },
     "mda": {
         "enable": None,  # Means MDA will only be enabled if recipients are listed.
