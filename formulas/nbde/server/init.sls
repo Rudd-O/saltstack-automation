@@ -1,9 +1,11 @@
 #!objects
 
 from salt://lib/qubes.sls import dom0, fully_persistent_or_physical, rw_only_or_physical
-from salt://lib/defs.sls import Perms
+from salt://lib/defs.sls import Perms, ReloadSystemdOnchanges
 from salt://prometheus/config.sls import config
 
+
+reloadsystemd = ReloadSystemdOnchanges(sls)
 
 if fully_persistent_or_physical():
     p = Pkg.installed("tang").requisite
@@ -21,6 +23,7 @@ ListenStream=7500
 """.strip(),
         makedirs=True,
         require=[m],
+        watch_in=[reloadsystemd]
     ).requisite
     preqs = [o]
 else:
@@ -31,10 +34,5 @@ if rw_only_or_physical():
         "90-tang",
         directories=["/var/db/tang"],
         require=preqs,
+        require_in=[reloadsystemd],
     ).requisite
-    Cmd.wait(
-        "systemctl daemon-reload for tangd",
-        name="systemctl --system daemon-reload",
-        watch=preqs,
-        require=[q],
-    )
