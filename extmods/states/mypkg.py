@@ -143,7 +143,7 @@ def _dom0_uptodate(name, pkgs=None):
         rex = "Upgrade.*Packages|Installing:|Removing:|Upgrading:|Updating:"
         text = ret.get("changes", {}).get("stdout", "")
         text += ret.get("changes", {}).get("stderr", "")
-        if re.search(rex, text):
+        if re.search(rex, text) and "Nothing to do." not in text:
             pass
         else:
             ret["changes"] = {}
