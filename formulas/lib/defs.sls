@@ -2,6 +2,7 @@
 
 import os
 import yaml
+import salt.utils.dictupdate
 
 
 class Perms(object):
@@ -101,7 +102,7 @@ def as_plain_dict(d):
 
 def PillarConfigWithDefaults(pillar_key, defaults, merge_lists=False):
     user = __salt__["pillar.get"](pillar_key, {})
-    config = __salt__["slsutil.merge"](defaults, user, merge_lists=merge_lists)
+    config = salt.utils.dictupdate.merge(defaults, user, strategy="smart", renderer="yaml", merge_lists=merge_lists)
     return Dotdict(config)
 
 
