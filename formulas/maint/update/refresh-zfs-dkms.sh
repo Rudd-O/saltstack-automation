@@ -30,7 +30,8 @@ do
         echo "=== Checking status of kernel version $kver ===" >&2
         dkms status -k "$kver" >&2
     else
-        dks=$(dkms status -k "$kver" | grep zfs || true)
+        reason=
+        dks=$(dkms status -k "$kver" | tail -1 | grep zfs || true) # tail to use latest DKMS ver
         if [ "$dks" == "" ] ; then
             # No ZFS for this kernel, we continue.
             continue
@@ -38,9 +39,14 @@ do
         echo "$dks" >&2 || true
         zfsver=$(echo "$dks" | egrep -o "(([0-9]+[.])+[0-9]+)" | head -1)
         installed=$(echo "$dks" | grep installed || true)
-        if [ "$zfsver" != "" ] && [ -z "$installed" -o "$force" == "true" ]
+        if [ "$zfsver" != "" ]
         then
-            echo "=== Rebuilding for kernel version $kver ===" >&2
+           if [ -z    "$installed" ] ; then reason="Not installed" ; fi
+           if [ "$force" == "true" ] ; then reason="Force rebuild" ; fi
+        fi
+        if [ -n "$reason" ]
+        then
+            echo "-> $reason -- rebuilding for kernel version $kver ($reason)" >&2
             $cmd dkms uninstall -k "$kver" zfs/"$zfsver" >&2 || echo "no need to uninstall" >&2
             $cmd dkms remove -k "$kver" zfs/"$zfsver" >&2 || echo "no need to remove" >&2
             $cmd dkms install -k "$kver" zfs/"$zfsver" >&2
@@ -51,6 +57,8 @@ do
                 fi
             fi
             changed=yes
+        else
+            echo "-> No reason to rebuild for kernel version $kver" >&2
         fi
     fi
 done
