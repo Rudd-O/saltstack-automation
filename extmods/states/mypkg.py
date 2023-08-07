@@ -38,7 +38,7 @@ def _single(subname, *args, **kwargs):
     return ret
 
 
-def installed(name, pkgs=None, version=None):
+def _installed(name, pkgs=None, version=None, mode="installed"):
     if os.access("/usr/bin/qubes-dom0-update", os.X_OK):
         before = _rpmlist()
         pkgs = pkgs or [name]
@@ -74,8 +74,11 @@ def installed(name, pkgs=None, version=None):
         else:
             missing = [pkgs[0] + "-" + version]
 
+        cmd = ["qubes-dom0-update", "--console", "--show-output", "-y"]
+        if mode == "update":
+            cmd.append("--action=update")
         p = subprocess.Popen(
-            ["qubes-dom0-update", "--console", "--show-output", "-y"] + missing,
+            cmd + missing,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
@@ -122,7 +125,15 @@ def installed(name, pkgs=None, version=None):
                 "stderr": stderr,
             }
     else:
-        return __states__["pkg.installed"](name=name, pkgs=pkgs)
+        return __states__[f"pkg.{mode}"](name=name, pkgs=pkgs, version=version)
+
+
+def installed(name, pkgs=None, version=None):
+    return _installed(name, pkgs, version, mode="installed")
+
+
+def latest(name, pkgs=None, version=None):
+    return _installed(name, pkgs, version, mode="latest")
 
 
 def _dom0_uptodate(name, pkgs=None):
