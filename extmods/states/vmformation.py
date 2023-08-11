@@ -8,9 +8,9 @@ import subprocess
 import yaml
 
 try:
-    from pipes import quote
-except ImportError:
     from shlex import quote
+except ImportError:
+    from pipes import quote
 
 
 class CustomDumper(yaml.SafeDumper):
