@@ -13,6 +13,16 @@ You can adjust all these services using pillar settings (detailed below).
 That said, the settings to make SPF and DKIM *reject* mail don't seem to
 work correctly.
 
+It is your responsibility to talk to your network hosting provider to set
+up reverse DNS for the public IPv4 (and possibly IPv6) address.  Most
+e-mail providers reject e-mail from addresses not resolving back to the
+host name of the sender mail server.  It is also your responsibility to
+set up the right A (possibly AAAA too) record in your DNS server pointing
+the host name of your mail server to your mail server's IP address, and
+the MX record, pointing the domains you want your mail server to handle
+mail for, to the host name of your mail server.  DKIM and SPF will also
+require additional DNS records, explained below.
+
 ## Let's encrypt support
 
 This formula will by default also rely on the
