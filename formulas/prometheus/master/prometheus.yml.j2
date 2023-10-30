@@ -100,14 +100,13 @@ scrape_configs:
       target_label: __address__
 
 {%-for scraper_type, data in scrapers.blackbox.items() %}
+{%-  set scraper_module = data.get("module", scraper_type) %}
 {%-  for scraper_location, data in data.items() %}
+{%-   if scraper_location != "module" %}
 {%-    set sources = data["sources"] %}
 {%-    for source, source_address in sources.items() %}
-{%-      set scraper = scraper_type + "_" + scraper_location + "_" + source %}
-{%-      set scraper_module = scraper_type %}
-{%-      if scraper_type == "http" %}{% set scraper_module = scraper_module + "_2xx" %}{% endif %}
-{%-      if scraper_type == "tcp" %}{% set scraper_module = scraper_module + "_connect" %}{% endif %}
-  - job_name: 'blackbox_{{ scraper }}'
+{%-      set scraper = "blackbox" + " " + source + " " + scraper_location + " " + scraper_type %}
+  - job_name: '{{ scraper }}'
 {%-    if 'scrape_interval' in data %}
     scrape_interval: {{ data.scrape_interval }}
 {%-    endif %}
@@ -130,27 +129,28 @@ scrape_configs:
     # Assign the address of the prober to the __address__ that Prometheus will contact.
     - target_label: __address__
       replacement: {{ source_address | json }}
-    # Use the fourth part of the label job to define the source label.
-    - source_labels: [job]
-      target_label: source
-      regex: (.*)_(.*)_(.*)_(.*)
-      replacement: ${4}
-    # Use the second part of the label job to define the module label.
+    # Use the fourth part of the label job to define the module label.
     - source_labels: [job]
       target_label: module
-      regex: (.*)_(.*)_(.*)_(.*)
-      replacement: ${2}
+      regex: (.*) (.*) (.*) (.*)
+      replacement: ${4}
     # Use the third part of the label job to define the location label.
     - source_labels: [job]
       target_label: location
-      regex: (.*)_(.*)_(.*)_(.*)
+      regex: (.*) (.*) (.*) (.*)
       replacement: ${3}
+    # Use the second part of the label job to define the source label.
+    - source_labels: [job]
+      target_label: source
+      regex: (.*) (.*) (.*) (.*)
+      replacement: ${2}
     # Finally, use the first part of the job ("blackbox") as the label job.
     - source_labels: [job]
       target_label: job
-      regex: (.*)_(.*)_(.*)_(.*)
+      regex: (.*) (.*) (.*) (.*)
       replacement: ${1}
 {%-    endfor %}
+{%-   endif %}
 {%-  endfor %}
 {%-endfor %}
 
