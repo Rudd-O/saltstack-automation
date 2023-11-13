@@ -7,8 +7,10 @@ docker = config.server.docker
 rpm = config.server.rpm
 slsp = "/".join(sls.split("."))
 
+include("nginx")
 
-p = Pkg.installed("nginx").requisite
+p = Pkg("nginx")
+srv = Service("nginx")
 
 se = Customselinux.policy_module_present(
     "nginxsamba",
@@ -16,16 +18,12 @@ se = Customselinux.policy_module_present(
     require=[p],
 ).requisite
 
-srv = Service.running(
-  "frontend service",
-  name="nginx",
-  watch=[p],
-  require=[se],
-).requisite
+old = File.absent("/etc/nginx/conf.d/repo.conf").requisite
 
 File.managed(
-    "/etc/nginx/conf.d/repo.conf",
+    "/etc/nginx/conf.d/vhosts/repo.conf",
     source=f"salt://{slsp}/repo.conf.j2",
+    makedirs=True,
     template="jinja",
     context={
         "rpm_basedir": rpm.paths.root,
@@ -35,7 +33,7 @@ File.managed(
         "docker_hostname": docker.vhost,
         "docker_htpasswd": docker.paths.htpasswd,
     },
-    require=[p],
+    require=[p, se, old],
     watch_in=[srv],
     **Perms.file
 ).requisite

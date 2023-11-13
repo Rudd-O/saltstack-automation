@@ -4,7 +4,7 @@
  
 user nginx;
 worker_processes auto;
-error_log /var/log/nginx/error.log;
+error_log /var/log/nginx/error.log notice;
 pid /run/nginx.pid;
 
 # Load dynamic modules. See /usr/share/doc/nginx/README.dynamic.
@@ -37,9 +37,8 @@ http {
     ssl_session_cache shared:SSL:16m;
     ssl_session_timeout 10m;
 
-    sendfile            on;
+    sendfile            {% if salt.pillar.get("nginx:http:sendfile", True) %}on{% else %}off{% endif %};
     tcp_nopush          on;
-    tcp_nodelay         on;
     keepalive_timeout   65;
     types_hash_max_size 4096;
 
@@ -52,9 +51,11 @@ http {
 
         server_name {{ grains.id }};
 
+{%- if salt.pillar.get("nginx:http:enable_ssl_redirect", True) %}
         location / {
             return 301 https://$host$request_uri;
         }
+{%- endif %}
 
         location /.well-known/acme-challenge {
             # used to get certbot to complete the HTTP challenge 

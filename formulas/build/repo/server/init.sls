@@ -13,7 +13,7 @@ extend:
     - require:
       - pkg: nginx
       - pkg: docker-distribution
-  frontend service:
+  nginx:
     service:
     - require:
       - test: docker-distribution accounts managed
