@@ -1,4 +1,4 @@
-#!pyobjects
+#!objects
 
 from salt://lib/defs.sls import Perms
 
