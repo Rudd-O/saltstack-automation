@@ -41,7 +41,7 @@ if fully_persistent_or_physical():
             Service.enabled(
                 f"openvpn-server@{server}",
                 require=[en1, en2],
-            )
+            ).requisite
         )
 
 else:
