@@ -86,9 +86,6 @@ def enroll_via_keyfile(name, keyfile, existing_keyfile=None, existing_passphrase
                     fi
                     echo Enrolling device {quoted_path}. >&2
                     changed=yes
-                    echo abc >&2
-                    cat {qexistingkeyfile} >&2
-                    echo def >&2
                     cryptsetup luksAddKey -y --key-file {qexistingkeyfile} {quoted_path} {quoted_keyfile} >&2
                     echo Testing enroll of {quoted_path}. >&2
                     cryptsetup luksOpen --test-passphrase --key-file {quoted_keyfile} {quoted_path} >&2
