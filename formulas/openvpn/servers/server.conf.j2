@@ -39,6 +39,6 @@ push "ping-restart {{ ping_restart | default("600") }}"
 ifconfig {{ local_ip }} 255.255.255.255
 
 
-up "/bin/bash -c '{% for c in clients.values() -%}
-/sbin/ip route add {{ c.ip }} dev {{ server }} ; {% endfor %} echo Routing table setup for all clients >&2'"
+up "/bin/bash -c '{% for c in clients.values() %}{% if not c.get("remove") -%}
+/sbin/ip route add {{ c.ip }} dev {{ server }} ; {% endif %}{% endfor %} echo Routing table setup for all clients >&2'"
 
