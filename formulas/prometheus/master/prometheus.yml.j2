@@ -237,10 +237,26 @@ scrape_configs:
       action: drop
 {%- endif %}
 
+{%- if scraper.startswith("smokeping") %}
+    metric_relabel_configs:
+    # Rename instance to source
+    - source_labels: [__name__, instance]
+      regex: smokeping_.+;(.+)
+      target_label: source
+      replacement: ${1}
+    # Rename host to instance
+    - source_labels: [__name__, host]
+      regex: smokeping_.+;(.+)
+      target_label: instance
+      replacement: ${1}
+    # Drop host
+    - regex: host
+      action: labeldrop
+{%- endif %}
+
 {%- if scraper.startswith("ebpf") %}
     metric_relabel_configs:
-    -
-      source_labels: [__name__, device]
+    - source_labels: [__name__, device]
       regex: 'ebpf_exporter.*;loop[0-9]+'
       action: drop
 {%- endif %}
