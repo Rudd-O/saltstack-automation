@@ -26,7 +26,7 @@ if rw_only_or_physical() and not dom0():
     var = File.directory("/var/lib/grafana", require=p, user="root", group="grafana", mode="0770").requisite
     plugins = File.directory("/var/lib/grafana/plugins", require=[var], user="root", group="grafana", mode="0770").requisite
     with Service("grafana-server", "watch_in"):
-        config = File.managed(
+        cfgfile = File.managed(
             '/etc/grafana/grafana.ini',
             source="salt://grafana/grafana.ini.j2",
             template='jinja',
@@ -35,22 +35,26 @@ if rw_only_or_physical() and not dom0():
             user="root",
             group="grafana",
         ).requisite
-        Cmd.run(
-            "Install grafana plugins",
-            name="""
-    set -e
-    grafana-cli plugins ls | grep camptocamp-prometheus-alertmanager-datasource >&2 || {
-        grafana-cli plugins install camptocamp-prometheus-alertmanager-datasource >&2
-        echo
-        echo changed=yes
-    }
-    """,
+        for plugin in config.plugins:
+            Cmd.run(
+                f"Install grafana plugin {plugin}",
+                name=f"""
+set -e
+if grafana-cli plugins ls | grep -q {plugin} >&2
+then
+    true
+else
+    grafana-cli plugins install {plugin} >&2
+    echo
+    echo changed=yes
+fi
+""",
             stateful=True,
-            require=[config, Qubes("grafana bind")] + p,
+            require=[cfgfile, Qubes("grafana bind")] + p,
         )
     Qubes.bind_dirs(
         'grafana bind',
         name="grafana",
         directories=['/var/lib/grafana', '/etc/grafana', '/etc/sysconfig/grafana', '/etc/sysconfig/grafana-server'],
-        require=p + [plugins, config],
+        require=p + [plugins, cfgfile],
     )

@@ -20,6 +20,7 @@ auth:
   anonymous: false
   # Set this to the default organization anonymous users will see.
   anonymous_org: ""
+plugins: []
 """ % (grains("id"), grains("fqdn"), grains("fqdn")))
 
 config = PillarConfigWithDefaults("grafana", defaults)
