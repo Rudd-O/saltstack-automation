@@ -74,11 +74,13 @@ def _installed(name, pkgs=None, version=None, mode="installed"):
         else:
             missing = [pkgs[0] + "-" + version]
 
+
         cmd = ["qubes-dom0-update", "--console", "--show-output", "-y"]
         if mode == "update":
             cmd.append("--action=update")
+        cmd = cmd + missing
         p = subprocess.Popen(
-            cmd + missing,
+            cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
@@ -92,7 +94,10 @@ def _installed(name, pkgs=None, version=None, mode="installed"):
                 "result": False,
                 "retcode": r,
                 "comment": (
-                    "Command failed with status code %s." % r
+                    "Command %s failed with status code %s." % (
+                        " ".join(quote(c) for c in cmd),
+                        r,
+                    )
                     + "\nStdout:\n%s" % stdout
                     + "\nStderr:\n%s" % stderr
                 ),
