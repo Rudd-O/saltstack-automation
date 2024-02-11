@@ -127,7 +127,9 @@ Defaults to on.
 When enabled, incoming mail goes through greylisting.  This reduces spam.
 
 If you use this setting, it could alternatively be a dictionary instead
-of a simple boolean:
+of a simple boolean.  This gives you control over what is greylisted
+in addition to the defaults that `postgrey` already ships with.  Here is
+a sample:
 
 ```
 ...
