@@ -474,7 +474,7 @@ def _absent_or_dead(name, mode, container_or_pod="container"):
                     if not __opts__["test"]:
                         co(["systemctl", "--system", "daemon-reload"])
 
-        subcmds = ["stop"] if is_running else []
+        subcmds = []
         if mode == "absent":
             subcmds.append("rm")
         for subcmd in subcmds:
