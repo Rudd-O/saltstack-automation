@@ -54,8 +54,8 @@ for mustbe in mustbes:
             ]:
                 os.makedirs(dest, exist_ok=True)
             syml = os.path.abspath(os.path.join(repo, arg))
-            tgt = os.path.abspath(os.path.join(repo, "unstable", arg))
-            if not os.path.exists(syml):
+            tgt = os.path.join("unstable", arg)
+            if not os.path.islink(syml):
                 os.symlink(tgt, syml)
             sys.exit(run(["bash", "-c", "createrepo_c %s >&2" % (shlex.quote(os.path.dirname(dest)),)]))
 
