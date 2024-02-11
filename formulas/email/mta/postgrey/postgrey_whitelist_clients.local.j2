@@ -1,0 +1,5 @@
+# Clients that should not be greylisted.  See postgrey(8).
+# This file is maintained by the email SaltStack formula.
+{% for entry in whitelist -%}
+{{ entry }}
+{% endfor -%}

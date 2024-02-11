@@ -1,0 +1,9 @@
+# postgrey whitelist for mail recipients
+# --------------------------------------
+# put this file in /etc/postfix or specify its path
+# with --whitelist-recipients=xxx
+# This file is maintained by the email SaltStack formula.
+
+{% for entry in whitelist -%}
+{{ entry }}
+{% endfor -%}

@@ -126,6 +126,23 @@ Defaults to on.
 
 When enabled, incoming mail goes through greylisting.  This reduces spam.
 
+If you use this setting, it could alternatively be a dictionary instead
+of a simple boolean:
+
+```
+...
+  email:
+    mta:
+      greylisting:
+        whitelist_clients: [list, of, domain, names, to, whitelist]
+        whitelist_recipients: [list, of, user, email, names,
+                               to, exempt, from, whitelisting]
+...
+```
+
+See the man page of `postgrey` to figure out what format these entries
+should be.
+
 ### `dkim:MinimumKeyBits`
 
 Defaults to 2048.
