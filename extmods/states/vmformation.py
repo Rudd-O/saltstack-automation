@@ -109,13 +109,15 @@ def generated(name, vm_manifest, only=None):
             if "vm_features" in data:
                 featuresid = vmid + " features"
                 sls[featuresid] = collections.OrderedDict()
-                sls[featuresid]["qvm.features"] = [
+                try:
+                 sls[featuresid]["qvm.features"] = [
                     {
                         "name": data["vm_name"],
                     },
                     {"set": [{k: v} for k, v in data["vm_features"].items()]},
                     {"require": [{"qvm": prefsid}]},
                 ]
+                except AttributeError: assert 0, data
             if "vm_services" in data and data["vm_services"]:
                 servicessid = vmid + " services"
                 sls[servicessid] = collections.OrderedDict()
