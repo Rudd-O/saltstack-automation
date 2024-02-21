@@ -19,6 +19,15 @@ def unique(l):
     return list(x.keys())
 
 
+def grp(lst):
+    if hasattr(lst, "append"):
+        if len(lst) > 1:
+            return "{ " + ", ".join(lst) + " }"
+        else:
+            return lst[0]
+    return lst
+
+
 def resolve_nodegroup(host_or_network, nodegroups):
     path = host_or_network.split(":")
     original_path = path[:]
@@ -145,7 +154,7 @@ def _transform_simple_rule_to_iptables(
                         "-m",
                         "multiport",
                         pflags,
-                        ",".join([x.strip() for x in v.split(",") if x.strip()]),
+                        ",".join(x.strip() for x in v.split(",") if x.strip()),
                     ]
                 )
             elif isinstance(v, list):
@@ -166,7 +175,6 @@ def _transform_simple_rule_to_iptables(
                 assert 0, "invalid %s %s" % (k, v)
         elif k == "pkttype":
             parts.extend(["-m", "pkttype", "--pkt-type", v])
-            del child_must_process[k]
         elif k == "icmp_type":
             parts.extend(["--icmp-type", v])
         elif k == "action":
@@ -273,26 +281,204 @@ def _transform_simple_rule_to_iptables(
     assert seen_action, ("rule", rule, "has no action")
 
     rules = []
-    if seen_action:
-        for src in srcs:
-            for dest in dests:
-                for proto in protos:
-                    rules.append(
-                        [default_chain]
-                        + proto
-                        + src
-                        + dest
-                        + parts
-                        + [
-                            "-m",
-                            "comment",
-                            "--comment",
-                            rule["comment"],
-                        ] if "comment" in rule else []
-                    )
+    for src in srcs:
+        for dest in dests:
+            for proto in protos:
+                rules.append(
+                    [default_chain]
+                    + proto
+                    + src
+                    + dest
+                    + parts
+                    + ([
+                           "-m",
+                           "comment",
+                           "--comment",
+                           rule["comment"],
+                       ] if "comment" in rule else [])
+                )
     for n, rule in enumerate(rules[:]):
         rules[n] = " ".join(quote(str(x)) for x in rule)
     return unique(rules)
+
+
+
+def _transform_simple_rule_to_nftables(
+    rule,
+    homenetwork,
+    nodegroups,
+    ip_version="ip",
+):
+    parts = []
+    protos = []
+    srcs = []
+    dests = []
+    action = None
+
+    def no_nft(k):
+        assert 0, f"nftables not supported for {k}"
+
+    ignore = set()
+
+    for k, v in list(rule.items()):
+        if k == "raw":
+            parts.extend([v])
+            action = "raw"
+        elif k == "proto":
+            if not isinstance(v, list):
+                v = [v]
+            for x in v:
+                protos.append(x)
+        elif k in ("to_ports", "from_ports"):
+            flag = "dport" if k == "to_ports" else "sport"
+            if not rule.get("proto") and not protos:
+                protos = ["tcp", "udp"]
+            if isinstance(v, str) and ("," in v or ":" in v):
+                parts.extend([
+                    flag,
+                    grp([x.strip() for x in v.split(",") if x.strip()])
+                ])
+            elif isinstance(v, list):
+                for x in v:
+                    if not isinstance(x, int):
+                        assert 0, "Port %r is not an integer" % x
+                parts.extend([
+                    flag,
+                    grp([str(x) for x in v])
+                ])
+            elif (isinstance(v, str) and re.match("^[0-9]+$", v)) or isinstance(v, int):
+                parts.extend([flag, v])
+            else:
+                assert 0, "invalid %s %s" % (k, v)
+        elif k == "pkttype":
+            parts.extend(["meta", "pkttype", v])
+        elif k == "icmp_type":
+            if protos:
+                if protos != ["icmp"]:
+                    assert 0, f"cannot use icmp_type with protos {protos}"
+            else:
+                protos = ["icmp"]
+            parts.extend(["icmp", "type", v])
+        elif k == "action":
+            assert not action, f"rule {rule} already has action {action}"
+            assert v.upper() in [
+                "ACCEPT",
+                "REJECT",
+                "DROP",
+                "RETURN",
+                "TEE",
+                "LOG",
+                "DNAT",
+                "MASQUERADE",
+            ], rule
+            if v.upper() == "TEE":
+                no_nft(v)
+                assert rule.get("gateway"), (rule, "has no gateway")
+                gateway = resolve(rule["gateway"], homenetwork, nodegroups)
+                if len(gateway) != 1:
+                    assert 0, (
+                        "rule",
+                        rule,
+                        "gateway",
+                        rule["gateway"],
+                        "resolves to more than one address",
+                    )
+                gateway = gateway[0]
+                parts.extend(["-j", v.upper(), "--gateway", gateway])
+                ignore.add("gateway")
+            elif v.upper() == "DNAT":
+                assert rule.get("dnat-to"), (rule, "has no dnat-to")
+                dnat_to = rule["dnat-to"]
+                if not isinstance(dnat_to, list):
+                    dnat_to = [dnat_to]
+                try:
+                    dnat_to, dnat_ports = [s.split(":", 1)[0] for s in dnat_to], [
+                        s.split(":", 1)[1] for s in dnat_to
+                    ]
+                    dnat_port = dnat_ports[0]
+                except IndexError:
+                    dnat_port = None
+                dnat_to = resolve(dnat_to, homenetwork, nodegroups)
+                if len(dnat_to) > 1:
+                    assert 0, (
+                        "rule",
+                        rule,
+                        "dnat-to",
+                        rule["dnat-to"],
+                        "resolves to more than one address",
+                    )
+                dnat_to = dnat_to[0]
+                if dnat_port:
+                    dnat_to = dnat_to + ":" + dnat_port
+                    assert 0, f"dnat ports {dnat_to} are not yet supported"
+                ignore.add("dnat-to")
+                action = " ".join(["dnat", "to", dnat_to])
+            elif v.upper() == "MASQUERADE":
+                action = v.lower()
+            elif v.upper() == "LOG":
+                no_nft(v)
+                parts.extend(["-j", v.upper()])
+                if "prefix" in rule:
+                    parts.extend(["--log-prefix", rule["prefix"]])
+                    ignore.add("prefix")
+            else:
+                action = v.lower()
+        elif k == "input_interface":
+            if isinstance(v, str):
+                v = [v]
+            srcs.append(["iifname", grp(v)])
+        elif k == "output_interface":
+            if isinstance(v, str):
+                v = [v]
+            srcs.append(["oifname", grp(v)])
+        elif k == "from":
+            vv = resolve(v, homenetwork, nodegroups)
+            srcs.append([ip_version, "saddr", grp(vv)])
+        elif k == "to":
+            vv = resolve(v, homenetwork, nodegroups)
+            dests.append([ip_version, "daddr", grp(vv)])
+        elif k == "comment":
+            # processed somewhere else
+            pass
+        elif k == "chain":
+            no_nft(k)
+        elif k not in ignore:
+            assert 0, (k, v, "unknown stanza %s" % k)
+
+    srcs = srcs or [[]]
+    dests = dests or [[]]
+    protos = protos or [None]
+    assert action, ("rule", rule, "has no action")
+    if action == "raw":
+        action = ""
+
+    rules = []
+    for src in srcs:
+        for dest in dests:
+            for proto in protos:
+                thisparts = list(parts)
+                for x, part in enumerate(thisparts):
+                    if part == "dport" or part == "sport":
+                        thisparts = thisparts[:x] + [proto] + thisparts[x:]
+                        break            
+                rules.append(
+                    ([] if not proto else [ip_version, "protocol", proto])
+                    + src
+                    + dest
+                    + thisparts
+                    + (
+                        [action] if action else []
+                    ) + (
+                        [
+                            f"# {rule['comment']}"
+                        ]
+                        if "comment" in rule else []
+                    )
+                )
+    for n, rule in enumerate(rules[:]):
+        rules[n] = " ".join(str(x) for x in rule)
+    return unique(rules)
+
 
 
 
@@ -359,7 +545,21 @@ def rule_to_iptables(
         res = [x for r in res for x in _transform_simple_rule_to_iptables(r, homenetwork, nodegroups, default_chain)]
         return res
     except (AssertionError, KeyError) as exc:
-        raise Exception("Cannot process rule %s" % rule) from exc
+        raise Exception("Cannot process iptables rule %s: %s" % (rule, exc)) from exc
+
+
+def rule_to_nftables(
+    rule,
+    homenetwork,
+    nodegroups,
+    ip_version,
+):
+    try:
+        res = complex_rule_to_simple_rules(rule, homenetwork, nodegroups)
+        res = [x for r in res for x in _transform_simple_rule_to_nftables(r, homenetwork, nodegroups, ip_version=ip_version)]
+        return res
+    except (AssertionError, KeyError) as exc:
+        raise Exception("Cannot process nftables rule %s: %s" % (rule, exc)) from exc
 
 
 def ruleset_to_iptables(
@@ -379,13 +579,42 @@ def ruleset_to_iptables(
                     v3["comment"] = k
                     try:
                         v3.update(v2)
-                    except ValueError:
-                        raise ValueError(f"rule {pprint.pformat(v2)} is not well-formed")
+                    except ValueError as e:
+                        raise ValueError(f"rule {pprint.pformat(v2)} is not well-formed ({e})" )
                     v2 = v3
                 r.append(v2)
         ruleset = r
     rules = []
     for rulegroup in ruleset:
         for rule in rule_to_iptables(rulegroup, homenetwork, nodegroups, default_chain):
+            rules.append(rule)
+    return rules
+
+
+def ruleset_to_nftables(
+    ruleset,
+    homenetwork,
+    nodegroups,
+    ip_version,
+):
+    if isinstance(ruleset, dict):
+        r = []
+        for k, v in ruleset.items():
+            for v2 in v:
+                if "comment" in v2:
+                    v2["comment"] = "%s: %s" % (k, v2["comment"])
+                else:
+                    v3 = collections.OrderedDict()
+                    v3["comment"] = k
+                    try:
+                        v3.update(v2)
+                    except ValueError as e:
+                        raise ValueError(f"rule {pprint.pformat(v2)} is not well-formed ({e})" )
+                    v2 = v3
+                r.append(v2)
+        ruleset = r
+    rules = []
+    for rulegroup in ruleset:
+        for rule in rule_to_nftables(rulegroup, homenetwork, nodegroups, ip_version):
             rules.append(rule)
     return rules
