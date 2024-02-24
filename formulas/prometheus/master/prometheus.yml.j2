@@ -49,53 +49,53 @@ scrape_configs:
       replacement: ${1}
     - 
       source_labels: [__address__]
-      regex: "(.+):(.+) at (.+) .*"
+      regex: "(.+):(.+) at (.*) .*"
       replacement: ${1}
       target_label: instance
     - 
       source_labels: [__address__]
-      regex: "(.+):(.+) at (.+) (on.*|via.*|direct)"
+      regex: "(.+):(.+) at (.*) (on.*|via.*|direct)"
       replacement: ${3}
       target_label: location
 
     # Proxied scrapers.
     - 
       source_labels: [__address__]
-      regex: "(.+):(.+) at (.+) via (.+):(.+)(/.+)"
+      regex: "(.+):(.+) at (.*) via (.+):(.+)(/.+)"
       replacement: ${1}
       target_label: __param_target
     - 
       source_labels: [__address__]
-      regex: "(.+):(.+) at (.+) via (.+):(.+)(/.+)"
+      regex: "(.+):(.+) at (.*) via (.+):(.+)(/.+)"
       replacement: ${2}
       target_label: __param_port
     - 
       source_labels: [__address__]
-      regex: "(.+):(.+) at (.+) via (.+):(.+)(/.+)"
+      regex: "(.+):(.+) at (.*) via (.+):(.+)(/.+)"
       replacement: ${6}
       target_label: __metrics_path__
     - 
       source_labels: [__address__]
-      regex: "(.+):(.+) at (.+) via (.+):(.+)(/.+)"
+      regex: "(.+):(.+) at (.*) via (.+):(.+)(/.+)"
       replacement: ${4}:${5}
       target_label: __address__
 
     # Aliased scrapers.
     - 
       source_labels: [__address__]
-      regex: "(.+):(.+) at (.+) on (.+):(.+)(/.+)"
+      regex: "(.+):(.+) at (.*) on (.+):(.+)(/.+)"
       replacement: ${6}
       target_label: __metrics_path__
     - 
       source_labels: [__address__]
-      regex: "(.+):(.+) at (.+) on (.+):(.+)(/.+)"
+      regex: "(.+):(.+) at (.*) on (.+):(.+)(/.+)"
       replacement: ${4}:${5}
       target_label: __address__
 
     # Direct scrapers.
     - 
       source_labels: [__address__]
-      regex: "(.+):(.+) at (.+) direct"
+      regex: "(.+):(.+) at (.*) direct"
       replacement: ${1}:${2}
       target_label: __address__
 
@@ -197,7 +197,7 @@ scrape_configs:
     static_configs:
     - targets:
 {%-  for target in data.targets %}
-      - {{ target }}:{{ data.port }} at {{ data.location }}{%
+      - {{ target }}:{{ data.port }} at {{ data.location | default("") }}{%
             if target in proxy_addresses
         %} via {{ proxy_addresses[target] }}/forward{%
             elif target in aliases
