@@ -136,6 +136,75 @@ def bind_dirs(name, directories):
     )
 
 
+def unbind_dirs(name, directories):
+    if not hasattr(directories, "append"):
+        directories = [directories]
+    ret = dict(name=name, result=False, changes={}, comment="")
+    if __salt__["grains.get"]("qubes:persistence") != "rw-only":
+        return _mimic(
+            ret,
+            {
+                "result": True,
+                "comment": "Nothing to do (not a Qubes OS AppVM with ephemeral root).",
+            },
+        )
+
+    try:
+        assert os.path.basename(name) == name, (
+            "The configuration name %r is not a base file name." % name
+        )
+        notabspath = [d for d in directories if os.path.abspath(d) != d]
+        assert not notabspath, (
+            "The following directories are not absolute paths: %s" % notabspath
+        )
+        inrw = [
+            d for d in directories if (d == "/rw/config" or d.startswith("/rw/config/"))
+        ]
+        assert not inrw, (
+            "The following directories reside in /rw/config and are not legitimate for this use: %s"
+            % inrw
+        )
+    except AssertionError as e:
+        return _mimic(ret, {"comment": str(e)})
+
+    rets = []
+    for directory in directories:
+        if os.path.ismount(directory):
+            rets.append(
+                _single(
+                    f"mount for {directory}",
+                    "mount.unmounted",
+                    name=directory,
+                )
+            )
+            if rets[-1]["result"] is False:
+                return _mimic(ret, rets[-1])
+
+    name = name + ".conf"
+    id_ = "/rw/config/qubes-bind-dirs.d/%s" % name
+    c = "\n".join("binds+=( %s )" % quote(d) for d in directories)
+    rets.append(
+        _single(
+            "bind-dirs file",
+            "file.absent",
+            name=id_,
+        )
+    )
+    if rets[-1]["result"] is False:
+        return _mimic(ret, rets[-1])
+
+    return _mimic(
+        ret,
+        {
+            "result": rets[-1]["result"],
+            "comment": "\n".join([r["comment"] for r in rets]),
+            "changes": dict(
+                (r["name"], r["changes"]) for r in rets if r.get("changes")
+            ),
+        },
+    )
+
+
 def enable_dom0_managed_service(
     name, scope="system", qubes_service_name=None, enable=True
 ):
