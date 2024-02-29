@@ -26,7 +26,7 @@ def services_restarted(name, exclude_services_globs=None, exclude_paths=None):
         comment.append(
             "Restarted services:\n%s" % "\n".join(["- %s" % k for k in r["restarted"]])
         )
-    if r["nonrestartable"]:
+    if "nonrestartable" in r and r["nonrestartable"]:
         comment.append(
             "Nonrestartable services:\n%s"
             % "\n".join(["- %s" % k for k in r["nonrestartable"]])
