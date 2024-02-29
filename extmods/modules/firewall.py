@@ -336,7 +336,7 @@ def _transform_simple_rule_to_nftables(
             if isinstance(v, str) and ("," in v or ":" in v):
                 parts.extend([
                     flag,
-                    grp([x.strip() for x in v.split(",") if x.strip()])
+                    grp([x.strip().replace(":", "-") for x in v.split(",") if x.strip()])
                 ])
             elif isinstance(v, list):
                 for x in v:
@@ -344,10 +344,10 @@ def _transform_simple_rule_to_nftables(
                         assert 0, "Port %r is not an integer" % x
                 parts.extend([
                     flag,
-                    grp([str(x) for x in v])
+                    grp([str(x).replace(":", "-") for x in v])
                 ])
             elif (isinstance(v, str) and re.match("^[0-9]+$", v)) or isinstance(v, int):
-                parts.extend([flag, v])
+                parts.extend([flag, str(v).replace(":", "-")])
             else:
                 assert 0, "invalid %s %s" % (k, v)
         elif k == "pkttype":
