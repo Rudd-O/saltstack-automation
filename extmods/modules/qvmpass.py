@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import collections
 import cryptography.fernet
+import hashlib
 import json
 import os
 import subprocess
@@ -38,11 +39,52 @@ def _cmd_with_serialization(cmd, **kwargs):
         return subprocess.check_output(cmd, **kwargs)
 
 
+def _get_keyring_id(name):
+    try:
+        o = subprocess.check_output(["keyctl", "show"], text=True)
+        return [
+            l.strip().split()[0]
+            for l in o.splitlines()
+            if l.endswith(f"keyring: {name}")
+        ][0]
+    except IndexError:
+        return None
+
+
+def _new_keyring(parent_keyring_id, keyring_name):
+    return subprocess.check_output(
+        ["keyctl", "newring", keyring_name, parent_keyring_id]
+    )[:-1]
+
+
+def _get_user_key_id(keyring_id, name):
+    try:
+        o = subprocess.check_output(["keyctl", "list", keyring_id], text=True)
+        return [
+            l.strip().split(":")[0]
+            for l in o.splitlines()
+            if l.endswith(f"user: {name}")
+        ][0]
+    except IndexError:
+        return None
+
+
+def _save_user_key(keyring_id, key_name, key_material):
+    return subprocess.check_output(
+        ["keyctl", "padd", "user", key_name, keyring_id],
+        input=key_material,
+    )[:-1]
+
+
+def _get_key(key_id):
+    return subprocess.check_output(["keyctl", "pipe", key_id])
+
+
 def _qvmpass_get(key, vm=None, text=True, generate=False, cache=True):
     if generate:
         assert key is not _TREE
 
-    def query_qvmpass():
+    def query_qvmpass(text):
         cmd = ["qvm-pass"] + (["-d", vm] if vm else []) + (["get-or-generate"] if generate else []) + (["--", key] if key is not _TREE else [])
         env = dict(os.environ.items())
         if text:
@@ -55,59 +97,51 @@ def _qvmpass_get(key, vm=None, text=True, generate=False, cache=True):
         )
 
     if not cache:
-        return query_qvmpass()
+        return query_qvmpass(text)
 
-    basepath = f"/run/user/{os.getuid()}/qvmpass-cache/"
-    os.makedirs(basepath, mode=0o700, exist_ok=True)
-    with open(os.path.join(basepath, "qvmpass.lock"), "a+") as lock:
+    lock_folder = f"/run/user/{os.getuid()}/qvmpass-cache/"
+    os.makedirs(lock_folder, mode=0o700, exist_ok=True)
+    with open(os.path.join(lock_folder, "qvmpass.lock"), "a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        lock.seek(0)
-        encryption_key_id = lock.read()
-        try:
-            encryption_key = subprocess.check_output(["keyctl", "print", encryption_key_id])[:-1]
-        except subprocess.CalledProcessError:
-            encryption_key = cryptography.fernet.Fernet.generate_key()
-            keyring_id = [
-                l.strip().split()[0]
-                for l in subprocess.check_output(["keyctl", "show"], text=True).splitlines()
-                if f"_uid.{os.getuid()}" in l
-            ][0]
-            p = subprocess.run(["keyctl", "padd", "user", "qvmpass-cache", keyring_id], input=encryption_key, check=True, capture_output=True)
-            encryption_key_id = p.stdout.decode("utf-8").splitlines()[0]
-            lock.seek(0)
-            lock.truncate()
-            lock.write(str(encryption_key_id))
-            lock.flush()
-        cryptor = cryptography.fernet.Fernet(encryption_key)
-        try:
-            if key is not _TREE:
-                abskey = os.path.abspath("/" + key)[len(os.path.sep):]
-                path = f"{basepath}/get/{abskey}"
-            else:
-                path = f"{basepath}/tree"
-            folder = os.path.dirname(path)
-            os.makedirs(folder, mode=0o700, exist_ok=True)
-            try:
-                with open(path, "rb") as f:
-                    encrypted_res = f.read()
-                    bytes_res = cryptor.decrypt(encrypted_res)
-                    res = bytes_res.decode("utf-8") if text else bytes_res
-            except (FileNotFoundError, cryptography.fernet.InvalidToken):
-                res = query_qvmpass()
-                tmpname = "." + os.path.basename(path) + "." + str(os.getpid()) + "." + str(threading.get_ident())
-                tmppath = os.path.join(folder, tmpname)
-                try:
-                    with open(tmppath, "wb") as f:
-                        bytes_res = res.encode("utf-8") if text else res
-                        encrypted_res = cryptor.encrypt(bytes_res)
-                        f.write(encrypted_res)
-                except Exception:
-                    os.unlink(tmppath)
-                    raise
-                os.rename(tmppath, path)
-            return res
-        finally:
-            fcntl.flock(lock, fcntl.LOCK_UN)
+
+        qvmpass_keyring = (
+            _get_keyring_id("qvmpass-cache")
+            or
+            _new_keyring(_get_keyring_id("_ses"), "qvmpass-cache")
+        )
+
+        encryption_key = _get_key(
+            _get_user_key_id(qvmpass_keyring, "qvmpass-cache-key")
+            or 
+            _save_user_key(qvmpass_keyring, "qvmpass-cache-key", cryptography.fernet.Fernet.generate_key())
+        )
+
+        fcntl.flock(lock, fcntl.LOCK_UN)
+
+    if key is not _TREE:
+        abskey = os.path.join("get", os.path.abspath("/" + key).lstrip(os.path.sep))
+        abskey = f"{abskey}-{vm}"
+    else:
+        abskey = "tree"
+
+    cache_key = hashlib.md5(abskey.encode("utf-8") + encryption_key).hexdigest()
+    cryptor = cryptography.fernet.Fernet(encryption_key)
+
+    with open(os.path.join(lock_folder, cache_key), "a+b") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        f.seek(0)
+        data = f.read()
+        if data:
+            fcntl.flock(f, fcntl.LOCK_UN)
+            res = cryptor.decrypt(data)
+        else:
+            res = query_qvmpass(False)
+            f.seek(0)
+            f.truncate()
+            f.write(cryptor.encrypt(res))
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+    return res.decode("utf-8") if text else res
 
 
 def _qvmpass_get_or_generate(key, vm=None, text=True):
