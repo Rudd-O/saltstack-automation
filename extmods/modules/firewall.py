@@ -37,7 +37,7 @@ def resolve_nodegroup(host_or_network, nodegroups):
         except KeyError:
             raise KeyError("no such nodegroup %s" % path[0])
         path = path[1:]
-    assert isinstance(nodegroups, list), (host_or_network, original_path, nodegroups)
+    assert isinstance(nodegroups, list), f"resolve_nodegroup: path {original_path} did not result in a list, it resulted in {nodegroups}"
     return nodegroups
 
 
@@ -209,31 +209,24 @@ def _transform_simple_rule_to_iptables(
                     rule,
                     "does not go to the PREROUTING chain",
                 )
-                assert rule.get("dnat-to"), (rule, "has no dnat-to")
-                dnat_to = rule["dnat-to"]
-                if not isinstance(dnat_to, list):
-                    dnat_to = [dnat_to]
-                try:
-                    dnat_to, dnat_ports = [s.split(":", 1)[0] for s in dnat_to], [
-                        s.split(":", 1)[1] for s in dnat_to
-                    ]
-                    dnat_port = dnat_ports[0]
-                except IndexError:
-                    dnat_port = None
-                dnat_to = resolve(dnat_to, homenetwork, nodegroups)
+                assert rule.get("target"), (rule, "has no target")
+                dnat_to = rule["target"]
+                if not isinstance(dnat_to, dict):
+                    assert 0, f"{dnat_to} is not a dictionary with address and port members"
+                dnat_to, dnat_port = resolve(dnat_to["address"], homenetwork, nodegroups), dnat_to.get("port")
                 if len(dnat_to) > 1:
                     assert 0, (
                         "rule",
                         rule,
-                        "dnat-to",
-                        rule["dnat-to"],
+                        "target",
+                        rule["target"],
                         "resolves to more than one address",
                     )
                 dnat_to = dnat_to[0]
                 if dnat_port:
                     dnat_to = dnat_to + ":" + dnat_port
                 parts.extend(["-j", v.upper(), "--to-destination", dnat_to])
-                ignore.add("dnat-to")
+                ignore.add("target")
             elif v.upper() == "MASQUERADE":
                 assert rule.get("chain", default_chain) == "POSTROUTING", (
                     "rule",
@@ -321,15 +314,23 @@ def _transform_simple_rule_to_nftables(
     ignore = set()
 
     for k, v in list(rule.items()):
+        negation = False
+        if k.startswith("not_"):
+            k = k[4:]
+            negation = True
+
         if k == "raw":
+            assert not negation, f"negation not allowed for {k}"
             parts.extend([v])
             action = "raw"
         elif k == "proto":
+            assert not negation, f"negation not allowed for {k}"
             if not isinstance(v, list):
                 v = [v]
             for x in v:
                 protos.append(x)
         elif k in ("to_ports", "from_ports"):
+            assert not negation, f"negation not allowed for {k}"
             flag = "dport" if k == "to_ports" else "sport"
             if not rule.get("proto") and not protos:
                 protos = ["tcp", "udp"]
@@ -351,8 +352,10 @@ def _transform_simple_rule_to_nftables(
             else:
                 assert 0, "invalid %s %s" % (k, v)
         elif k == "pkttype":
+            assert not negation, f"negation not allowed for {k}"
             parts.extend(["meta", "pkttype", v])
         elif k == "icmp_type":
+            assert not negation, f"negation not allowed for {k}"
             if protos:
                 if protos != ["icmp"]:
                     assert 0, f"cannot use icmp_type with protos {protos}"
@@ -360,6 +363,7 @@ def _transform_simple_rule_to_nftables(
                 protos = ["icmp"]
             parts.extend(["icmp", "type", v])
         elif k == "action":
+            assert not negation, f"negation not allowed for {k}"
             assert not action, f"rule {rule} already has action {action}"
             assert v.upper() in [
                 "ACCEPT",
@@ -387,31 +391,24 @@ def _transform_simple_rule_to_nftables(
                 parts.extend(["-j", v.upper(), "--gateway", gateway])
                 ignore.add("gateway")
             elif v.upper() == "DNAT":
-                assert rule.get("dnat-to"), (rule, "has no dnat-to")
-                dnat_to = rule["dnat-to"]
-                if not isinstance(dnat_to, list):
-                    dnat_to = [dnat_to]
-                try:
-                    dnat_to, dnat_ports = [s.split(":", 1)[0] for s in dnat_to], [
-                        s.split(":", 1)[1] for s in dnat_to
-                    ]
-                    dnat_port = dnat_ports[0]
-                except IndexError:
-                    dnat_port = None
-                dnat_to = resolve(dnat_to, homenetwork, nodegroups)
+                assert rule.get("target"), (rule, "has no target")
+                dnat_to = rule["target"]
+                if not isinstance(dnat_to, dict):
+                    assert 0, f"{dnat_to} is not a dictionary with address and port members"
+                dnat_to, dnat_port = resolve(dnat_to["address"], homenetwork, nodegroups), dnat_to.get("port")
                 if len(dnat_to) > 1:
                     assert 0, (
                         "rule",
                         rule,
-                        "dnat-to",
-                        rule["dnat-to"],
+                        "target",
+                        rule["target"],
                         "resolves to more than one address",
                     )
                 dnat_to = dnat_to[0]
                 if dnat_port:
                     dnat_to = dnat_to + ":" + dnat_port
                     assert 0, f"dnat ports {dnat_to} are not yet supported"
-                ignore.add("dnat-to")
+                ignore.add("target")
                 action = " ".join(["dnat", "to", dnat_to])
             elif v.upper() == "MASQUERADE":
                 action = v.lower()
@@ -424,20 +421,23 @@ def _transform_simple_rule_to_nftables(
             else:
                 action = v.lower()
         elif k == "input_interface":
+            assert not negation, f"negation not allowed for {k}"
             if isinstance(v, str):
                 v = [v]
             srcs.append(["iifname", grp(v)])
         elif k == "output_interface":
+            assert not negation, f"negation not allowed for {k}"
             if isinstance(v, str):
                 v = [v]
             srcs.append(["oifname", grp(v)])
         elif k == "from":
             vv = resolve(v, homenetwork, nodegroups)
-            srcs.append([ip_version, "saddr", grp(vv)])
+            srcs.append([ip_version, "saddr"] + (["!="] if negation else []) + [grp(vv)])
         elif k == "to":
             vv = resolve(v, homenetwork, nodegroups)
-            dests.append([ip_version, "daddr", grp(vv)])
+            dests.append([ip_version, "daddr"] + (["!="] if negation else []) + [grp(vv)])
         elif k == "comment":
+            assert not negation, f"negation not allowed for {k}"
             # processed somewhere else
             pass
         elif k == "chain":
@@ -480,8 +480,6 @@ def _transform_simple_rule_to_nftables(
     return unique(rules)
 
 
-
-
 def complex_rule_to_simple_rules(
     rule,
     homenetwork,
@@ -511,8 +509,11 @@ def complex_rule_to_simple_rules(
                 for tupl in combined_tuples:
                     newrule = {}
                     for inner_dict in tupl:
-                        for k, v in inner_dict.items():
-                            add(newrule, inner_dict, k, v)
+                        try:
+                            for k, v in inner_dict.items():
+                                add(newrule, inner_dict, k, v)
+                        except Exception:
+                            assert 0, inner_dict
                     new_rules.append(newrule)
                 child_stanzas_list = []
                 for new_rule in new_rules:
