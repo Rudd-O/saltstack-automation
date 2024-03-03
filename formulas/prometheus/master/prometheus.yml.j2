@@ -102,6 +102,7 @@ scrape_configs:
 {%-for scraper_type, data in scrapers.blackbox.items() %}
 {%-  set scraper_module = data.get("module", scraper_type) %}
 {%-  for scraper_location, data in data.items() %}
+{%-   if "location" in data %}{% set scraper_location = data["location"] %}{% endif -%}
 {%-   if scraper_location != "module" %}
 {%-    set sources = data["sources"] %}
 {%-    for source, source_address in sources.items() %}
