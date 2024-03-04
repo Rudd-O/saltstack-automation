@@ -306,6 +306,8 @@ def _transform_simple_rule_to_nftables(
     protos = []
     srcs = []
     dests = []
+    log = None
+    counter = False
     action = None
 
     def no_nft(k):
@@ -354,6 +356,9 @@ def _transform_simple_rule_to_nftables(
         elif k == "pkttype":
             assert not negation, f"negation not allowed for {k}"
             parts.extend(["meta", "pkttype", v])
+        elif k == "fib":
+            assert not negation, f"negation not allowed for {k}"
+            parts.extend(["fib", v])
         elif k == "icmp_type":
             assert not negation, f"negation not allowed for {k}"
             if protos:
@@ -362,6 +367,12 @@ def _transform_simple_rule_to_nftables(
             else:
                 protos = ["icmp"]
             parts.extend(["icmp", "type", v])
+        elif k == "log_prefix":
+            log = ["prefix", "\"" + v.replace("\"", "\\\"") + "\"" ]
+            ignore.add("log_prefix")
+        elif k == "counter" and v:
+            counter = True
+            ignore.add("counter")
         elif k == "action":
             assert not negation, f"negation not allowed for {k}"
             assert not action, f"rule {rule} already has action {action}"
@@ -377,6 +388,7 @@ def _transform_simple_rule_to_nftables(
             ], rule
             if v.upper() == "TEE":
                 no_nft(v)
+                assert 0, "Logging not implemented for this rule yet"
                 assert rule.get("gateway"), (rule, "has no gateway")
                 gateway = resolve(rule["gateway"], homenetwork, nodegroups)
                 if len(gateway) != 1:
@@ -411,15 +423,11 @@ def _transform_simple_rule_to_nftables(
                 ignore.add("target")
                 action = " ".join(["dnat", "to", dnat_to])
             elif v.upper() == "MASQUERADE":
-                action = v.lower()
+                action = " ".join([v.lower()])
             elif v.upper() == "LOG":
-                no_nft(v)
-                parts.extend(["-j", v.upper()])
-                if "prefix" in rule:
-                    parts.extend(["--log-prefix", rule["prefix"]])
-                    ignore.add("prefix")
+                action = " ".join([v.lower()])
             else:
-                action = v.lower()
+                action = " ".join([v.lower()])
         elif k == "input_interface":
             assert not negation, f"negation not allowed for {k}"
             if isinstance(v, str):
@@ -449,6 +457,18 @@ def _transform_simple_rule_to_nftables(
     dests = dests or [[]]
     protos = protos or [None]
     assert action, ("rule", rule, "has no action")
+    if log:
+        if action == "raw":
+            assert 0, "raw rules cannot have log_prefix"
+        action = " ".join(
+            ["log"]
+            + log
+            + ([] if action == "log" else [action])
+        )
+    if counter:
+        if action == "raw":
+            assert 0, "raw rules cannot have counter"
+        action = f"counter {action}"
     if action == "raw":
         action = ""
 
