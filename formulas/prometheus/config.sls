@@ -17,12 +17,10 @@ master:
   recording_rules: {}
   alerting_rules: {}
   aliases: {}
-  proxy_addresses: {}
   scrapers:
     direct: {}
     snmp: {}
     blackbox: {}
-  proxy_addresses: {}
 alertmanager:
   url: http://%s:9093/
   global: {}

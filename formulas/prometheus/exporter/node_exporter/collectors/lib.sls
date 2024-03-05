@@ -62,11 +62,10 @@ def collector(n, ext=None):
             disable=False,
             watch_in=[Cmd("Reload systemd for node exporter")],
         ).requisite
-        qubified = Qubes.enable_dom0_managed_service(
-            f"{n} qubified",
+        nonqubified_timer = Qubes.disable_dom0_managed_service(
+            f"{n} timer disqubified",
             name=f"{n}.timer",
             qubes_service_name="node_exporter",
-            enable=False,
             watch_in=[Cmd("Reload systemd for node exporter")],
             require=[service, nonqubified],
         ).requisite
@@ -75,7 +74,7 @@ def collector(n, ext=None):
             f'/etc/systemd/system/{n}.timer',
             source=f"salt://{slsp}/{n}.timer",
             watch_in=[Cmd("Reload systemd for node exporter")],
-            require=[qubified],
+            require=[nonqubified_timer],
             **Perms.file,
         ).requisite
 
@@ -91,9 +90,8 @@ def collector(n, ext=None):
         svcwatch = [colldir]
         svcrequire = []
 
-    if not template():
-        exec_ = Cmd.wait(
-            f"systemctl --system start --no-block {n}",
-            watch=svcwatch,
-            require=svcrequire,
-        ).requisite
+    exec_ = Cmd.wait(
+        f"systemctl --system start --no-block {n}",
+        watch=svcwatch,
+        require=svcrequire,
+    ).requisite

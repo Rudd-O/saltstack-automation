@@ -29,8 +29,8 @@ if updateable():
         f"/etc/tmpfiles.d/{name}.conf",
     ).requisite
 
-    svcenabled = Qubes.enable_dom0_managed_service(
-        f"{name} enabled",
+    svcdisabled = Qubes.disable_dom0_managed_service(
+        f"{name} disqubified",
         name=name,
         require=[p],
     ).requisite
@@ -51,14 +51,14 @@ if updateable():
     ).requisite
 
     svcwatch = [conf, wait_for_tmpfilesconf]
-    svcrequire = [daemonreload, svcenabled, tmpfiles_created]
+    svcrequire = [daemonreload, svcdisabled, tmpfiles_created]
 else:
     svcwatch = []
     svcrequire = [tmpfiles_created]
 
-if not template():
-    svcrunning = Service.running(
-        name,
-        watch=svcwatch,
-        require=svcrequire,
-    ).requisite
+svcrunning = Service.running(
+    name,
+    watch=svcwatch,
+    require=svcrequire,
+    enable=True,
+).requisite

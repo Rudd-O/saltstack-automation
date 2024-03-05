@@ -55,7 +55,25 @@ def without(first, second):
     return [f for f in first if f not in second]
 
 
+def filter_dict_drop_these_values(dictionary, blacklist):
+    ret = {}
+    for key, value in dictionary.items():
+        if value in blacklist:
+            continue
+        ret[key] = value
+    return ret
+
+
+def filter_dict_keep_these_values(dictionary, whitelist):
+    ret = {}
+    for key, value in dictionary.items():
+        if value in whitelist:
+            ret[key] = value
+    return ret
+
+
 if __name__ == "__main__":
+    print(dict_without_values({"a": "b", "c": "d"}, ["d"]))
     print(escape_regex("dom0"))
     print(escape_regex_anchored("dom0"))
     print(escape_regex_anchored(["dom0", "dom0.castle"]))

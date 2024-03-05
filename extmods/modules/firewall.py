@@ -116,7 +116,7 @@ def resolve(host_or_network, homenetwork, nodegroups):
     except KeyError:
         pass
     addrs = __salt__["dnsutil.A"](host_or_network)
-    assert addrs, (host_or_network, addrs)
+    assert addrs, f"{host_or_network} resolved to no address"
     return addrs
 
 

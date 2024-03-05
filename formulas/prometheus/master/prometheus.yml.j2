@@ -61,7 +61,7 @@ scrape_configs:
     # Proxied scrapers.
     - 
       source_labels: [__address__]
-      regex: "(.+):(.+) at (.*) via (.+):(.+)(/.+)"
+      regex: "([^.]+)(.*?):(.+) at (.*) via (.+):(.+)(/.+)"
       replacement: ${1}
       target_label: __param_target
     - 
@@ -199,8 +199,8 @@ scrape_configs:
     - targets:
 {%-  for target in data.targets %}
       - {{ target }}:{{ data.port }} at {{ data.location | default("") }}{%
-            if target in proxy_addresses
-        %} via {{ proxy_addresses[target] }}/forward{%
+            if "target_to_proxy_map" in data and target in data["target_to_proxy_map"]
+        %} via {{ data["target_to_proxy_map"][target] }}{%
             elif target in aliases
         %} on {{ aliases[target] }}:{{ data.port }}/metrics{%
             else

@@ -4,11 +4,9 @@ Various states to help with deployment on Qubes VMs.
 
 import re
 import os
+import subprocess
 
-try:
-    from shlex import quote
-except ImportError:
-    from pipes import quote
+from shlex import quote
 
 
 def __virtual__():
@@ -20,6 +18,23 @@ def _mimic(tgtdict, srcdict):
         if k in srcdict:
             tgtdict[k] = srcdict[k]
     return tgtdict
+
+
+def _mimic_from_rets(ret, rets):
+    if rets:
+        return _mimic(
+            ret,
+            {
+                "result": False if any(r["result"] is False for r in rets) else None if any(r["result"] is False for r in rets) else True,
+                "comment": "\n".join(r["comment"] for r in rets if "comment" in r),
+                "changes": dict(
+                    (r["name"], r["changes"]) for r in rets if r["changes"]
+                ),
+            },
+        )
+    else:
+        ret["result"] = True 
+        return ret
 
 
 def _single(subname, *args, **kwargs):
@@ -84,22 +99,34 @@ def bind_dirs(name, directories):
     except AssertionError as e:
         return _mimic(ret, {"comment": str(e)})
 
-    ret1 = _single(
+    rets = []
+
+    rets.append(_single(
         "bind-dirs directory",
         "file.directory",
         name="/rw/config/qubes-bind-dirs.d",
         mode="0755",
         user="root",
         group="root",
-    )
+    ))
+    if rets[-1]["result"] is False:
+        return _mimic_from_rets(ret, rets)
 
-    if ret1["result"] is False:
-        return _mimic(ret, ret1)
+    for directory in directories:
+        rw_bind_dir_parent = os.path.dirname(os.path.join("/rw/bind-dirs", directory.lstrip("/")))
+        rets.append(_single(
+            rw_bind_dir_parent,
+            "file.directory",
+            name=rw_bind_dir_parent,
+            makedirs=True,
+        ))
+        if rets[-1]["result"] is False:
+            return _mimic_from_rets(ret, rets)
 
     name = name + ".conf"
     id_ = "/rw/config/qubes-bind-dirs.d/%s" % name
     c = "\n".join("binds+=( %s )" % quote(d) for d in directories)
-    ret2 = _single(
+    rets.append(_single(
         "bind-dirs file",
         "file.managed",
         name=id_,
@@ -107,33 +134,22 @@ def bind_dirs(name, directories):
         user="root",
         group="root",
         contents=c,
-    )
+    ))
+    if rets[-1]["result"] is False:
+        return _mimic_from_rets(ret, rets)
 
-    if ret2["result"] is False:
-        return _mimic(ret, ret2)
-
-    if ret2["changes"] or any(not os.path.ismount(d) for d in directories):
-        ret3 = _single(
+    if any(r["changes"] for r in rets) or any(not os.path.ismount(d) for d in directories):
+        rets.append(_single(
             "bind-dirs.sh",
             "cmd.run",
             name="/usr/lib/qubes/init/bind-dirs.sh",
-        )
-
-        if ret3["result"] is False:
-            return _mimic(ret, ret3)
+        ))
+        if rets[-1]["result"] is False:
+            return _mimic_from_rets(ret, rets)
     else:
-        ret3 = {"result": True, "comment": "No need to reload bind dirs", "changes": {}}
+        rets.append({"result": True, "comment": "No need to reload bind dirs", "changes": {}})
 
-    return _mimic(
-        ret,
-        {
-            "result": ret3["result"],
-            "comment": "\n".join([r["comment"] for r in [ret1, ret2, ret3]]),
-            "changes": dict(
-                (r["name"], r["changes"]) for r in [ret1, ret2, ret3] if r["changes"]
-            ),
-        },
-    )
+    return _mimic_from_rets(ret, rets)
 
 
 def unbind_dirs(name, directories):
@@ -178,7 +194,7 @@ def unbind_dirs(name, directories):
                 )
             )
             if rets[-1]["result"] is False:
-                return _mimic(ret, rets[-1])
+                return _mimic_from_rets(ret, rets)
 
     name = name + ".conf"
     id_ = "/rw/config/qubes-bind-dirs.d/%s" % name
@@ -191,18 +207,13 @@ def unbind_dirs(name, directories):
         )
     )
     if rets[-1]["result"] is False:
-        return _mimic(ret, rets[-1])
+        return _mimic_from_rets(ret, rets)
 
-    return _mimic(
-        ret,
-        {
-            "result": rets[-1]["result"],
-            "comment": "\n".join([r["comment"] for r in rets]),
-            "changes": dict(
-                (r["name"], r["changes"]) for r in rets if r.get("changes")
-            ),
-        },
-    )
+    return _mimic_from_rets(ret, rets)
+
+
+def _updateable_qubes_vm():
+    return __salt__["grains.get"]("qubes:updateable") and __salt__["grains.get"]("qubes:vm_type")
 
 
 def enable_dom0_managed_service(
@@ -242,8 +253,11 @@ def enable_dom0_managed_service(
             name=name, result=True, changes={}, comment="Service explicitly not enabled"
         )
 
-    if __salt__["grains.get"]("qubes:vm_type", "").lower() != "TemplateVM".lower():
-        # Nothing to do (not a Qubes OS TemplateVM).
+    if _updateable_qubes_vm():
+        # Qubes VM.  Updateable (template or standalone).
+        pass
+    else:
+        # Nothing to do (not a Qubes OS VM).
         return ret1
 
     types = [
@@ -313,8 +327,11 @@ def disable_dom0_managed_service(
             name=name, result=True, changes={}, comment="Service explicitly not disabled"
         )
 
-    if __salt__["grains.get"]("qubes:vm_type", "").lower() != "TemplateVM".lower():
-        # Nothing to do (not a Qubes OS TemplateVM).
+    if _updateable_qubes_vm():
+        # Qubes VM.  Updateable (template or standalone).
+        pass
+    else:
+        # Nothing to do (not a Qubes OS VM).
         return ret1
 
     types = [
@@ -344,3 +361,62 @@ def disable_dom0_managed_service(
             ),
         },
     )
+
+
+def qvm_service(name, vms, action, services=None):
+    ret = dict(name=name, result=False, changes={}, comment="")
+
+    svcs = [name]
+    if services:
+        svcs = services
+
+    if not isinstance(vms, list):
+        vms = [vms]
+
+    current_service_state = {}
+    for vm in vms:
+        try:
+            output = subprocess.check_output(["qvm-service", "--", vm], stderr=subprocess.STDOUT, text=True)
+        except Exception as e:
+            ret["comment"] = f"qvm-service failed ({e}):\n{output.strip()}"
+
+        current_service_state_for_vm = [
+            line.split() for line
+            in output.splitlines()
+            if line.strip()
+        ]
+        try:
+            current_service_state[vm] = {svc: st for svc, st in current_service_state_for_vm}
+        except Exception: assert 0, current
+
+    rets = []
+    for vm, current_service_state_for_vm in current_service_state.items():
+        for service in svcs:
+            if action is True:
+                if current_service_state_for_vm.get(service) == "on":
+                    continue
+                rets.append(_single(
+                    f"Enable {service} for {vm}",
+                    "cmd.run",
+                    name=f"qvm-service -e -- {quote(vm)} {quote(service)}",
+                ))
+            elif action is False:
+                if current_service_state_for_vm.get(service) == "off":
+                    continue
+                rets.append(_single(
+                    f"Disable {service} for {vm}",
+                    "cmd.run",
+                    name=f"qvm-service -d -- {quote(vm)} {quote(service)}",
+                ))
+            elif action is None:
+                if current_service_state_for_vm.get(service) is None:
+                    continue
+                rets.append(_single(
+                    f"Unset {service} for {vm}",
+                    "cmd.run",
+                    name=f"qvm-service -D -- {quote(vm)} {quote(service)}",
+                ))
+            else:
+                assert 0, f"not reached: state = {action}"
+    
+    return _mimic_from_rets(ret, rets)
