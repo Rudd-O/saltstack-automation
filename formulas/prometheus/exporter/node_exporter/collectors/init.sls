@@ -1,13 +1,14 @@
 #!objects
 
-from salt://lib/qubes.sls import template
+from salt://lib/qubes.sls import updateable
 
 
 if grains("os") in ("Fedora", "Qubes"):
     include(sls + ".needs-restart-collector")
 include(sls + ".systemd-unit-state-collector")
+include(sls + ".folder")
 
-if template():
+if updateable():
     reqs = []
 else:
     reqs=  [
@@ -17,5 +18,3 @@ else:
         reqs += [
             Cmd("systemctl --system start --no-block needs-restart-collector"),
         ]
-
-Test.nop("After collector setup", require=reqs)

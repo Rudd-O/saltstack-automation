@@ -1,7 +1,7 @@
 #!objects
 
 from salt://prometheus/exporter/node_exporter/config.sls import config
-from salt://lib/qubes.sls import template
+from salt://lib/qubes.sls import updateable
 
 
 name = "node_exporter"
@@ -9,8 +9,14 @@ textfile_directory = config.paths.textfile_directory
 
 milestone = Test.nop("Collector directory created").requisite
 
-if template():
-    File.absent(textfile_directory, require_in=[milestone])
+if updateable():
+    File.directory(
+        textfile_directory,
+        mode="0750",
+        user="root",
+        group="prometheus",
+        require_in=[milestone],
+    )
 else:
     with File.directory(
         textfile_directory,
