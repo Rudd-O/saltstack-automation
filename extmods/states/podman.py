@@ -8,10 +8,8 @@ import re
 import subprocess
 from subprocess import check_output as co, CalledProcessError
 
-try:
-    from shlex import quote
-except ImportError:
-    from pipes import quote
+from shlex import quote
+import shlex
 
 
 def __virtual__():
@@ -41,18 +39,27 @@ def _escape_unit(name):
     return co(["systemd-escape", "-m", "--", name], text=True).rstrip()
 
 
-def present(name, image, options=None, dryrun=False, enable=None):
+def _runas_wrap(cmd, runas=None):
+    if not runas:
+        return cmd
+    return ["su", "-", runas, "-s", "/bin/bash", "-c", shlex.join(cmd)]
+
+
+def present(name, image, options=None, dryrun=False, enable=None, runas=None):
     """
     Creates a container with a name, and runs it under systemd.
 
     If dryrun is specified, the existing properties of the
     container are checked, and changes are returned accordingly
     without making any changes.
+
+    `runas` specifies under what host system user to run the
+    container as.
     """
     options = options or []
 
     try:
-        o = co(["podman", "container", "inspect", name])
+        o = co(_runas_wrap(["podman", "container", "inspect", name], runas=runas))
         container_exists = True
         v = json.loads(o)
         try:
@@ -124,6 +131,8 @@ def present(name, image, options=None, dryrun=False, enable=None):
                             name=" ".join(
                                 quote(x) for x in ["podman", "container", subcmd, name]
                             ),
+                            runas=runas,
+                            clean_env=True,
                         )
                     )
             if success():
@@ -132,6 +141,8 @@ def present(name, image, options=None, dryrun=False, enable=None):
                         "Container new",
                         "cmd.run",
                         name=" ".join(quote(x) for x in cmd),
+                        runas=runas,
+                        clean_env=True,
                     )
                 )
         else:
@@ -151,13 +162,17 @@ def present(name, image, options=None, dryrun=False, enable=None):
                     "Container start",
                     "cmd.run",
                     name=" ".join(quote(x) for x in cmd),
+                    runas=runas,
+                    clean_env=True,
                 )
             )
 
     if success():
         if not __opts__["test"] or container_exists:
 
-            unit = co("podman generate systemd --no-header".split() + [name], text=True)
+            unit = co(_runas_wrap("podman generate systemd --no-header".split() + [name], runas=runas), text=True)
+            if runas:
+                unit = unit.replace(f"[Service]", f"[Service]\nUser={runas}")
             a(
                 _single(
                     "systemd service creation",
@@ -427,7 +442,7 @@ def pod_running(name, options, containers, dryrun=False, enable=None):
     )
 
 
-def _absent_or_dead(name, mode, container_or_pod="container"):
+def _absent_or_dead(name, mode, container_or_pod="container", runas=None):
     """
     Stops a container by name.
     """
@@ -486,6 +501,8 @@ def _absent_or_dead(name, mode, container_or_pod="container"):
                         name=" ".join(
                             quote(x) for x in ["podman", container_or_pod, subcmd, name]
                         ),
+                        runas=runas,
+                        clean_env=True,
                     )
                 )
 
