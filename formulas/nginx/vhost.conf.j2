@@ -9,7 +9,9 @@
         add_header Strict-Transport-Security "max-age=63072000; preload" always;
 {%-     endif %}
 
+        {%- if sameorigin | default(True) %}
         add_header X-Frame-Options "sameorigin";
+        {%- endif %}
         add_header Content-Type-Options "nosniff";
 
 {%-     for port in ports %}
