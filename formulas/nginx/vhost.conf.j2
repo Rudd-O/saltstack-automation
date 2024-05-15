@@ -14,7 +14,9 @@
 
 {%-     for port in ports %}
         listen {{ port }} ssl http2;
+        {%- if salt.pillar.get("nginx:enable_ipv6", True) %}
         listen [::]:{{ port }} ssl http2;
+        {%- endif %}
 {%-     endfor %}
 
         server_name {{ server_name }};

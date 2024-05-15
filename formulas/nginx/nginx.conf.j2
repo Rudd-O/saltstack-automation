@@ -47,7 +47,9 @@ http {
 
     server {
         listen 80 default_server;
+        {%- if salt.pillar.get("nginx:enable_ipv6", True) %}
         listen [::]:80 default_server;
+        {%- endif %}
 
         server_name {{ grains.id }};
 
