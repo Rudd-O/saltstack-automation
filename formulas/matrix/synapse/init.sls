@@ -41,8 +41,9 @@ if not template():
         group="synapse",
         require=[Qubes('90-matrix-synapse')]
     )
+    qsigning_key_path = __salt__["text.quote"](signing_key_path)
     Cmd.run(
-        "/usr/bin/generate_signing_key.py -o " + salt.text.quote(signing_key_path),
+        "/usr/bin/generate_signing_key.py -o " + qsigning_key_path,
         creates=signing_key_path,
         require=[Qubes('90-matrix-synapse'), File(confdir)],
         watch_in=[Service("synapse")],

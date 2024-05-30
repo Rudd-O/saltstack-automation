@@ -28,6 +28,7 @@ default_exclude_paths = [
     "/home",
     "/tmp",
     "/memfd",
+    "/memfd:",
 ]
 
 defaults = {
