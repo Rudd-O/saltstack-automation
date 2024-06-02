@@ -134,7 +134,7 @@ def enroll_via_tang_server(name, url, existing_keyfile=None, existing_passphrase
     ]
 
     if any(j == server for server in bound_tang_servers):
-        return dict(name=name, result=True, changes={}, comment="Device {name} already paired with Tang server {url}")
+        return dict(name=name, result=True, changes={}, comment=f"Device {name} already paired with Tang server {url}")
     
     with _keyfile(existing_keyfile, existing_passphrase, tmpdir) as k:
         qexistingkeyfile = quote(k)
