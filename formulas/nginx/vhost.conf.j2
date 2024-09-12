@@ -15,9 +15,10 @@
         add_header Content-Type-Options "nosniff";
 
 {%-     for port in ports %}
-        listen {{ port }} ssl http2;
+        listen {{ port }} ssl;
+        http2 on;
         {%- if salt.pillar.get("nginx:enable_ipv6", True) %}
-        listen [::]:{{ port }} ssl http2;
+        listen [::]:{{ port }} ssl;
         {%- endif %}
 {%-     endfor %}
 
