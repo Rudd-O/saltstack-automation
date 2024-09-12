@@ -54,6 +54,7 @@ globalsievedir = File.directory(
 globalsievedirselinux = Selinux.fcontext_policy_present(
     "Ensure default context for /var/lib/sieve",
     name="/var/lib/sieve",
+    filetype="a",
     sel_user="system_u",
     sel_type="dovecot_etc_t",
     require=[globalsievedir],

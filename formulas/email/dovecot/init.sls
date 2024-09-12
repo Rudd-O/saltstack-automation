@@ -23,7 +23,7 @@ if context["enable"]:
 with Pkg.installed(
     "dovecot-pkg",
     pkgs=["openssl", "dovecot"],
-    require_in=[Pkg("dovecot-pigeonhole")] if context["enable"] else [],
+    require_in=[Pkg("Pigeonhole and bogofilter")] if context["enable"] else [],
 ):
     File.managed(
         "/etc/dovecot/local.conf",

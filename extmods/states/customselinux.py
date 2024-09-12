@@ -20,7 +20,7 @@ def _single(subname, *args, **kwargs):
     return ret
 
 
-def policy_module_present(name, source):
+def policy_module_present(name, source=None, contents=None):
     rets = []
     a, success, lastchanged = (
         rets.append,
@@ -35,6 +35,7 @@ def policy_module_present(name, source):
             name=f"/etc/selinux/targeted/local/{fname}.te",
             makedirs=True,
             source=source,
+            contents=contents,
         )
     )
     if success() and lastchanged():
