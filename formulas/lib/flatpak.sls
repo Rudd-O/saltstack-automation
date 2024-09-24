@@ -32,7 +32,6 @@ echo changed=$changed
             stateful=True,
             require=[p],
         ).requisite
-        
     else:
         return Cmd.wait(f"echo nothing to do for {sls}").requisite
 
@@ -81,6 +80,12 @@ def flatpak_updated(name=None, require=None):
         return Cmd.run(
             f"{name}",
             name=f"""
+if ! which flatpak >/dev/null 2>&1 ; then
+    echo
+    echo changed=no comment='No Flatpak apps installed on thys system'
+    exit 0
+fi
+
 changed=no
 export https_proxy=""" + _proxy() + f"""
 export http_proxy=""" + _proxy() + f"""
