@@ -1,6 +1,7 @@
-#!pyobjects
+#!objects
 
 from salt://lib/qubes.sls import dom0, fully_persistent_or_physical
+from salt://lib/flatpak.sls import flatpak_updated
 from salt://maint/config.sls import config
 
 
@@ -17,6 +18,8 @@ if fully_persistent_or_physical() or dom0():
         "update packages",
         require=[Cmd("check ZFS module before")],
     ).requisite
+
+    freq = flatpak_updated(require=updreq)
 
     if grains("os") in ["Fedora", "Qubes"]:
         rest = Maint.services_restarted(
