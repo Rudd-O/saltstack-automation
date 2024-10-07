@@ -82,7 +82,7 @@ def flatpak_updated(name=None, require=None):
             name=f"""
 if ! which flatpak >/dev/null 2>&1 ; then
     echo
-    echo changed=no comment='No Flatpak apps installed on thys system'
+    echo changed=no comment='No Flatpak apps installed on this system'
     exit 0
 fi
 

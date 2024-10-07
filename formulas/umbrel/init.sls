@@ -19,6 +19,23 @@
   - watch_in:
     - cmd: reload systemd
 
+Mask qubes iptables:
+  cmd.run:
+  - name: |
+      set -e
+      if grep -q ExecStart /etc/systemd/system/qubes-iptables.service.d/mask.conf
+      then
+          exit
+      fi
+      mkdir -p /etc/systemd/system/qubes-iptables.service.d/
+      echo "[Service]
+      ExecStart=
+      ExecStart=/usr/bin/echo Disabled
+      " > /etc/systemd/system/qubes-iptables.service.d/mask.conf
+      echo
+      echo changed=yes
+  - stateful: yes
+
 reload systemd:
   cmd.wait:
   - name: systemctl --system daemon-reload
