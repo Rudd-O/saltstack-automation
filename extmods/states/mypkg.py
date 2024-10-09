@@ -95,7 +95,7 @@ def _installed(name, pkgs=None, version=None, mode="installed"):
                 "retcode": r,
                 "comment": (
                     "Command %s failed with status code %s." % (
-                        " ".join(quote(c) for c in cmd),
+                        " ".join(shlex.quote(c) for c in cmd),
                         r,
                     )
                     + "\nStdout:\n%s" % stdout
