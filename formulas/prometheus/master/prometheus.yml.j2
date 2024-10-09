@@ -262,6 +262,16 @@ scrape_configs:
       action: drop
 {%- endif %}
 
+{%- if scraper.startswith("zfs") %}
+    metric_relabel_configs:
+    - source_labels: [__name__]
+      regex: 'zfs_dataset_(avail|size)_bytes'
+      action: drop
+    - source_labels: [__name__, type]
+      regex: 'zfs_dataset_(compress_ratio|refer_bytes);snapshot'
+      action: drop
+{%- endif %}
+
 {% endfor %}
 
 {% for module, data in scrapers.snmp.items() %}
