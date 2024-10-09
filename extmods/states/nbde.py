@@ -36,7 +36,16 @@ def _keyfile(existing_keyfile=None, existing_passphrase=None, tmpdir=None):
         yield f.name
 
 
-def enroll_via_keyfile(name, keyfile, existing_keyfile=None, existing_passphrase=None, tmpdir=None, *args, **kwargs):
+@contextlib.contextmanager
+def _passphrase(passphrase, tmpdir=None):
+    data = passphrase.encode("utf-8") if passphrase else b""
+    with tempfile.NamedTemporaryFile(dir=tmpdir, mode="wb", prefix="nbde-") as f:
+        f.write(data)
+        f.flush()
+        yield f.name
+
+
+def enroll_via_keyfile(name, keyfile, existing_keyfile=None, existing_passphrase=None, tmpdir=None, also_add_passphrase=False, *args, **kwargs):
     """
     Add a keyfile to a LUKS device.
     
@@ -46,6 +55,7 @@ def enroll_via_keyfile(name, keyfile, existing_keyfile=None, existing_passphrase
     * keyfile: the file containing a key to be added to the device
     * existing_keyfile: (optional) a keyfile with a key that can decrypt the device
     * existing_passphrase: (optional) a passphrase that can decrypt the device
+    * also_add_passphrase: if encrypted using a key file, add the existing_passphrase if not already present
     * tmpdir: (optional) a directory for temporary LUKS key files
 
     If modifications must be done, either existing_keyfile or existing_passphrase
@@ -55,10 +65,12 @@ def enroll_via_keyfile(name, keyfile, existing_keyfile=None, existing_passphrase
     """
     quoted_path = quote(name)
     quoted_keyfile = quote(keyfile)
+    quoted_also_add_passphrase = "1" if also_add_passphrase else "0"
+    assert not (existing_keyfile and existing_passphrase), "Both existing keyfile and existing passphrase are not supported"
     
 
     with _keyfile(existing_keyfile, existing_passphrase, tmpdir) as k:
-        qexistingkeyfile = quote(k)
+        qexistingcreds = quote(k)
         return _single(
             name,
             "cmd.run",
@@ -77,19 +89,31 @@ def enroll_via_keyfile(name, keyfile, existing_keyfile=None, existing_passphrase
                 fi
                 if cryptsetup luksOpen --test-passphrase --key-file {quoted_keyfile} {quoted_path} >&2
                 then
-                    echo Device {quoted_path} decrypts correctly. >&2
+                    echo Device {quoted_path} decrypts correctly using keyfile {quoted_keyfile}. >&2
                 else
-                    if [ ! -f {qexistingkeyfile} ] || [ $(stat -c %s {qexistingkeyfile}) = 0 ]
+                    if [ ! -f {qexistingcreds} ] || [ $(stat -c %s {qexistingcreds}) = 0 ]
                     then
                         echo To enroll device {quoted_path}, an existing_keyfile or existing_passphrase is needed >&2
                         exit 16
                     fi
                     echo Enrolling device {quoted_path}. >&2
                     changed=yes
-                    cryptsetup luksAddKey -y --key-file {qexistingkeyfile} {quoted_path} {quoted_keyfile} >&2
+                    cryptsetup luksAddKey -y --key-file {qexistingcreds} {quoted_path} {quoted_keyfile} >&2
                     echo Testing enroll of {quoted_path}. >&2
                     cryptsetup luksOpen --test-passphrase --key-file {quoted_keyfile} {quoted_path} >&2
                     echo Enrolled device {quoted_path}. >&2
+                fi
+                if [ {quoted_also_add_passphrase} == 1 ]
+                then
+                    if cryptsetup luksOpen --test-passphrase --key-file {qexistingcreds} {quoted_path} >&2
+                    then
+                        echo Device {quoted_path} decrypts correctly using passphrase. >&2
+                    else
+                        echo Adding passphrase to {quoted_path} >&2
+                        changed=yes
+                        cryptsetup luksAddKey -y --key-file {quoted_keyfile} {quoted_path} {qexistingcreds} >&2
+                        echo Added passphrase to device {quoted_path} >&2
+                    fi
                 fi
                 echo
                 if [ "$changed" = "yes" ] ; then echo changed=$changed ; fi
@@ -137,12 +161,12 @@ def enroll_via_tang_server(name, url, existing_keyfile=None, existing_passphrase
         return dict(name=name, result=True, changes={}, comment=f"Device {name} already paired with Tang server {url}")
     
     with _keyfile(existing_keyfile, existing_passphrase, tmpdir) as k:
-        qexistingkeyfile = quote(k)
+        qexistingcreds = quote(k)
         return _single(
             name,
             "cmd.run",
             name=f"""
-                if [ ! -f {qexistingkeyfile} ] || [ $(stat -c %s {qexistingkeyfile}) = 0 ]
+                if [ ! -f {qexistingcreds} ] || [ $(stat -c %s {qexistingcreds}) = 0 ]
                 then
                     echo To enroll device {quoted_path}, an existing_keyfile or existing_passphrase is needed >&2
                     exit 16
@@ -150,7 +174,7 @@ def enroll_via_tang_server(name, url, existing_keyfile=None, existing_passphrase
                 set -e
                 set -o pipefail
                 echo Enrolling device {quoted_path}. >&2
-                clevis luks bind -y -k {qexistingkeyfile} -d {quoted_path} tang {qjson} >&2
+                clevis luks bind -y -k {qexistingcreds} -d {quoted_path} tang {qjson} >&2
                 echo Enrolled device {quoted_path}. >&2
                 echo
                 echo changed=yes

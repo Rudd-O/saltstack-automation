@@ -30,6 +30,7 @@ for device in __salt__["nbde.devices_from_crypttab"]().values():
             name=device["path"],
             keyfile=device["keyfile"],
             existing_passphrase=context.get("passphrase"),
+            also_add_passphrase=True,
             require=[p],
             #watch_in=[dracut],
         )
