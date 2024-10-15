@@ -210,66 +210,8 @@ scrape_configs:
 {%-  endfor %}
     relabel_configs: *relabel_configs
 
-{%- if scraper.startswith("plone") %}
-    metric_relabel_configs:
-    - source_labels: [__name__]
-      regex: zope_connection_([0-9])+_(.*)
-      target_label: thread
-      replacement: ${1}
-    - source_labels: [__name__]
-      regex: zope_connection_([0-9])+_(.*)
-      target_label: __name__
-      replacement: zope_connection_${2}
-{%- endif %}
-
-{%- if scraper.startswith("node") %}
-    metric_relabel_configs:
-    # Do not ingest non-failed metrics.
-    - source_labels: [__name__, state]
-      regex: "systemd_unit_state;(active|inactive)"
-      action: drop
-    # Do not ingest non-remote sessions.
-    - source_labels: [__name__, remote]
-      regex: "node_logind_sessions;false"
-      action: drop
-    # Do not ingest sessions with seats.
-    - source_labels: [__name__, seat]
-      regex: "node_logind_sessions;seat.+"
-      action: drop
-{%- endif %}
-
-{%- if scraper.startswith("smokeping") %}
-    metric_relabel_configs:
-    # Rename instance to source
-    - source_labels: [__name__, instance]
-      regex: smokeping_.+;(.+)
-      target_label: source
-      replacement: ${1}
-    # Rename host to instance
-    - source_labels: [__name__, host]
-      regex: smokeping_.+;(.+)
-      target_label: instance
-      replacement: ${1}
-    # Drop host
-    - regex: host
-      action: labeldrop
-{%- endif %}
-
-{%- if scraper.startswith("ebpf") %}
-    metric_relabel_configs:
-    - source_labels: [__name__, device]
-      regex: 'ebpf_exporter.*;loop[0-9]+'
-      action: drop
-{%- endif %}
-
-{%- if scraper.startswith("zfs") %}
-    metric_relabel_configs:
-    - source_labels: [__name__]
-      regex: 'zfs_dataset_(avail|size)_bytes'
-      action: drop
-    - source_labels: [__name__, type]
-      regex: 'zfs_dataset_(compress_ratio|refer_bytes);snapshot'
-      action: drop
+{%- if data.metric_relabel_configs | default(None) %}
+    metric_relabel_configs: {{ data.metric_relabel_configs | json }}
 {%- endif %}
 
 {% endfor %}
