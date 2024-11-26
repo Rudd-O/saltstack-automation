@@ -26,7 +26,7 @@ nextcloud:
   # The first item in this list will be the domain to which
   # the Nextcloud instance responds to (i.e. if this was
   # machine.local, then the URL that serves Nextcloud will 
-  # be http://machine.local/ .
+  # be http://machine.local/ ).
   # More domains are optionally possible too.
   - cloud.dragonfear
 ```
@@ -35,4 +35,5 @@ nextcloud:
 
 * Running the OCC command to change settings, or making administrative settings
   changes in the UI, causes some settings which this formula sets up to be
-  erased.  I'm working on a solution to this issue.
+  erased.  I'm working on a solution to this issue.  For now, the settings
+  chunk is disabled.
