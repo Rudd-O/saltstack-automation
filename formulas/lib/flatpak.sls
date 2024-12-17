@@ -36,8 +36,9 @@ echo changed=$changed
         return Cmd.wait(f"echo nothing to do for {sls}").requisite
 
 
-def flatpak_pkg_installed(name, **kwargs):
+def flatpak_pkg_installed(name, from_repo=None, **kwargs):
     if fully_persistent_or_physical() and not dom0():
+        from_repo_quoted = quote(from_repo) if from_repo else ""
         return Cmd.run(
             f"Install {name}",
             name=f"""
@@ -48,7 +49,7 @@ if flatpak list | grep -q {quote(name)}
 then
     true
 else
-    flatpak install -y {quote(name)} >&2 || exit $?
+    flatpak install -y {from_repo_quoted} {quote(name)} >&2 || exit $?
     echo Flatpak package installed >&2
     changed=yes
 fi
