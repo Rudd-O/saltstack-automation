@@ -147,6 +147,15 @@ ErrorDocument 404 /index.php/error/404
             append_if_not_found=True,
             require=[setup],
         ).requisite
+        arr = ", ".join(f"{n} => '{td}'" for n, td in enumerate(context["trusted_proxies"]))
+        r1 = File.replace(
+            "trusted_proxies setting",
+            name="/etc/nextcloud/config.php",
+            pattern=".CONFIG[[].trusted_proxies.[]].*",
+            repl=f"$CONFIG['trusted_proxies'] = array({arr});",
+            append_if_not_found=True,
+            require=[setup],
+        ).requisite
         primarydomain = context["trusted_domains"][0]
         r2 = File.replace(
             "overwrite.cli.url setting",
