@@ -1,3 +1,4 @@
+
 {%- if ssl_certificate is defined and ssl_certificate_key is defined %}
 {%-   if not ports is defined %}{% set ports = [443] %}{% endif %}
 
@@ -14,9 +15,9 @@
         {%- endif %}
         add_header Content-Type-Options "nosniff";
 
+        http2 on;
 {%-     for port in ports %}
         listen {{ port }} ssl;
-        http2 on;
         {%- if salt.pillar.get("nginx:enable_ipv6", True) %}
         listen [::]:{{ port }} ssl;
         {%- endif %}
