@@ -30,6 +30,20 @@ letsencrypt:
       fake: true
 ```
 
+Finally, you can also hard-code certificates.  In this case, the certificate
+material should contain the full chain PEM of all certificates in the order
+required by NginX and other HTTP servers.
+
+```
+letsencrypt:
+  hosts:
+    example.org:
+      key:
+        ...private key material...
+      certificate: |
+        ...public certificate material...
+```
+
 When your host has multiple accounts, Let's Encrypt's `certbot` will abort with a
 prompt demanding to select which account to use.  Bypass the prompt thus:
 

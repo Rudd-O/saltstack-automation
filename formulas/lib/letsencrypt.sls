@@ -17,6 +17,16 @@ def fake_for(hostname):
     return fake
 
 
+def custom_cert_and_key_for(hostname):
+    context = pillar("letsencrypt", {})
+    data = context["hosts"][hostname]
+    certificate = data.get("certificate", None)
+    key = data.get("key", None)
+    if certificate and key:
+        return (certificate, key)
+    return None
+
+
 def certificate_dir(hostname):
     return os.path.join(certbot_live, hostname)
 

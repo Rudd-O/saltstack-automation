@@ -4,7 +4,7 @@ from shlex import quote
 from os.path import dirname
 
 from salt://lib/qubes.sls import template, fully_persistent_or_physical
-from salt://lib/letsencrypt.sls import certbot_webroot, certbot_live, certificate_dir, fullchain_path, privkey_path, renewal_hook, fake_for
+from salt://lib/letsencrypt.sls import certbot_webroot, certbot_live, certificate_dir, fullchain_path, privkey_path, renewal_hook, fake_for, custom_cert_and_key_for
 
 
 # FIXME: if all requested certificates are fake, simply do not include NginX at all.
@@ -65,6 +65,26 @@ if not template():
                 else:
                     C = Cmd.wait
                     cmd = "echo Certificates are already generated"
+            elif custom_cert_and_key_for(host):
+                custom_cert, custom_key = custom_cert_and_key_for(host)
+                saved_cert =File.managed(
+                    cert,
+                    contents=custom_cert,
+                    makedirs=True,
+                    mode="0644",
+                    require_in=Cmd("generate certificate for %s" % host),
+                    watch_in=[Service("nginx")],
+                ).requisite
+                saved_key = File.managed(
+                    key,
+                    contents=custom_key,
+                    makedirs=True,
+                    mode="0600",
+                    require_in=Cmd("generate certificate for %s" % host),
+                    watch_in=[Service("nginx")],
+                ).requisite
+                cmd = "restorecon $(dirname %(cert)s) %(cert)s %(key)s" % locals()
+                C = Cmd.run
             else:
                 at_least_one_is_not_fake = True
                 renewal_email = data.get("renewal_email", default_renewal_email)
@@ -89,7 +109,7 @@ if not template():
                 name=cmd,
                 require=[Service("nginx running in HTTP-only mode")] + deps,
                 watch_in=[Service("nginx")],
-                require_in=[Test("all certificates generated")] + ([] if fake_for(host) else [Cmd("certbot timer running")]),
+                require_in=[Test("all certificates generated")] + ([] if (fake_for(host) or custom_cert_and_key_for(host)) else [Cmd("certbot timer running")]),
                 creates=cert,
             )
 
