@@ -319,3 +319,6 @@ php_admin_value[upload_temp_dir] = /var/tmp
             append_if_not_found=True,
             require=[r2],
         ).requisite
+        # not currently managed:
+        # * log_level
+        # * enabledPreviewProviders (not in pillar either)
