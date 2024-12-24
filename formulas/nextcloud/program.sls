@@ -9,12 +9,103 @@ if fully_persistent_or_physical():
     include("rpmfusion")
     ffmpeg = Pkg.installed("ffmpeg").requisite
     with Pkg.installed("nextcloud", pkgs=["nextcloud", "libreoffice-core"], require=[ffmpeg]):
+        scan_s = File.managed(
+            "/usr/lib/systemd/system/nextcloud-external-scan.service",
+            contents="""
+[Unit]
+Description=Cron for nextcloud file scanning job
+
+[Service]
+# https://docs.nextcloud.com/server/25/admin_manual/configuration_server/background_jobs_configuration.html#systemd
+Type=oneshot
+User=apache
+KillMode=process
+ExecStart=/usr/bin/php -f /usr/share/nextcloud/occ files:scan --all --unscanned
+"""
+        ).requisite
+        scan_t = File.managed(
+            "/usr/lib/systemd/system/nextcloud-external-scan.timer",
+            contents="""[Unit]
+Description=This triggers the nextcloud external file scan service
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=5min
+
+[Install]
+WantedBy=timers.target
+""",
+            require=[scan_s],
+        ).requisite
+        preview_s = File.managed(
+            "/usr/lib/systemd/system/nextcloud-generate-previews.service",
+            contents="""
+[Unit]
+Description=Cron for nextcloud preview generation job
+
+[Service]
+# https://docs.nextcloud.com/server/25/admin_manual/configuration_server/background_jobs_configuration.html#systemd
+Type=oneshot
+User=apache
+KillMode=process
+ExecStart=/usr/bin/php -f /usr/share/nextcloud/occ preview:pre-generate
+"""
+        ).requisite
+        preview_t = File.managed(
+            "/usr/lib/systemd/system/nextcloud-generate-previews.timer",
+            contents="""[Unit]
+Description=This triggers the nextcloud preview generation service
+
+[Timer]
+OnBootSec=15min
+OnUnitInactiveSec=120min
+
+[Install]
+WantedBy=timers.target
+""",
+            require=[preview_s],
+        ).requisite
+        notify_s = File.managed(
+            "/usr/lib/systemd/system/nextcloud-external-notify.service",
+            contents="""[Unit]
+Description=SAMBA-based notification of modified files
+After=php-fpm.service
+
+[Service]
+# https://docs.nextcloud.com/server/25/admin_manual/configuration_server/background_jobs_configuration.html#systemd
+Type=exec
+User=apache
+ExecStart=/usr/bin/bash -c 'for a in $(/usr/share/nextcloud/occ files_external:list --all | grep -E "^[|] [0-9]+.*SMB/CIFS" | cut -d " " -f 2) ; do /usr/share/nextcloud/occ files_external:notify $a & done ; wait'
+
+[Install]
+WantedBy=php-fpm.service
+"""
+        ).requisite
         q1 = Qubes.enable_dom0_managed_service("httpd.socket", qubes_service_name="httpd").requisite
         q2 = Qubes.enable_dom0_managed_service("nextcloud-cron.timer", qubes_service_name="nextcloud-cron").requisite
-        q3 = Qubes.enable_dom0_managed_service("php-fpm", qubes_service_name="php-fpm").requisite
-    deps = [q1, q2, q3]
+        q3 = Qubes.enable_dom0_managed_service("nextcloud-external-scan.timer", qubes_service_name="nextcloud-cron", require=[scan_s]).requisite
+        q4 = Qubes.enable_dom0_managed_service("php-fpm", qubes_service_name="php-fpm").requisite
+        q5 = Qubes.enable_dom0_managed_service("nextcloud-external-notify", qubes_service_name="nextcloud-cron").requisite
+        q6 = Qubes.enable_dom0_managed_service("nextcloud-generate-previews.timer", qubes_service_name="nextcloud-cron", require=[preview_s]).requisite
+    deps = [q1, q2, q3, q4, q5, q6]
 else:
-    deps = []
+    scan_s = Test.nop("External scan.service").requisite
+    scan_t = Test.nop("External scan.timer").requisite
+    preview_s = Test.nop("Generate previews.service").requisite
+    preview_t = Test.nop("Generate previews.timer").requisite
+    notify_s = Test.nop("External notify.service").requisite
+    deps = [scan_s, scan_t, notify_s, preview_s, preview_t]
+    q3 = Test.nop("nextcolud external scan Qubes").requisite
+    q4 = Test.nop("php-fpm service Qubes").requisite
+    q5 = Test.nop("nextcloud external notify Qubes").requisite
+    q6 = Test.nop("nextcloud generate preview Qubes").requisite
+
+reload_ = Cmd.run(
+    f"reload systemd for {sls}",
+    name="systemctl --system daemon-reload",
+    onchanges=[scan_s, scan_t, preview_s, preview_t,  notify_s],
+    require_in=[q3, q4, q5, q6],
+).requisite
 
 if not template():
     context = pillar("nextcloud", {})
@@ -174,7 +265,22 @@ php_admin_value[upload_temp_dir] = /var/tmp
         runas="apache",
         cwd="/usr/share/nextcloud",
         creates="/var/lib/nextcloud/.setup",
-        require=[s],
+        require=[s1, s2],
+    ).requisite
+    Service.running(
+        "nextcloud-external-scan.timer",
+        watch=[scan_s, scan_t],
+        require=[reload_, setup],
+    ).requisite
+    Service.running(
+        "nextcloud-generate-previews.timer",
+        watch=[preview_s, preview_t],
+        require=[reload_, setup],
+    ).requisite
+    Service.running(
+        "nextcloud-external-notify",
+        watch=[notify_s],
+        require=[reload_, setup],
     ).requisite
 
     if 0:
