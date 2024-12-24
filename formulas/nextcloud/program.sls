@@ -128,15 +128,40 @@ Redirect 301 /.well-known/nodeinfo   /index.php/.well-known/nodeinfo
 """.lstrip(),
         require=[t],
     ).requisite
+    phpsettings = File.managed(
+        "/etc/php-fpm.d/nextcloud-custom.conf",
+        contents="""[nextcloud]
+php_admin_value[memory_limit] = 2G
+php_admin_value[opcache.jit] = 1255
+php_admin_value[opcache.jit_buffer_size] = 8M
+php_admin_value[opcache.interned_strings_buffer] = 64
+php_admin_value[upload_max_filesize] = {{ max_upload_size | default("50M") }}
+php_admin_value[post_max_size] = {{ max_upload_size | default("50M") }}
+php_admin_value[sys_temp_dir] = /var/tmp
+php_admin_value[upload_temp_dir] = /var/tmp
+""",
+        template="jinja",
+        context=context,
+    ).requisite
     b = Qubes.bind_dirs(
         '90-nextcloud',
         directories=['/var/lib/nextcloud', "/etc/httpd/conf.d/z-nextcloud-access.conf", "/etc/nextcloud"],
         require=deps + [h],
     ).requisite
-    s = Service.running(
+    phpsettings_binddir = Qubes.bind_dirs(
+        '90-nextcloud-php-fpm',
+        directories=["/etc/php-fpm.d/nextcloud-custom.conf"],
+        require=deps + [phpsettings],
+    ).requisite
+    s1 = Service.running(
         "httpd",
         watch=[h],
         require=[b],
+    ).requisite
+    s2 = Service.running(
+        "php-fpm",
+        watch=[phpsettings],
+        require=[phpsettings_binddir],
     ).requisite
     qdbname = quote(context["database"]["name"])
     qdbuser = quote(context["database"]["user"])
