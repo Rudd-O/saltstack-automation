@@ -239,6 +239,17 @@ php_admin_value[upload_temp_dir] = /var/tmp
         directories=['/var/lib/nextcloud', "/etc/httpd/conf.d/z-nextcloud-access.conf", "/etc/nextcloud"],
         require=deps + [h],
     ).requisite
+    logsdir = File.directory(
+        "/var/log/nextcloud",
+        user="apache",
+        group="apache",
+        mode="0770",
+    ).requisite
+    logsbind = Qubes.bind_dirs(
+        '90-nextcloud-logs',
+        directories=['/var/log/nextcloud'],
+        require=deps + [logsdir],
+    ).requisite
     phpsettings_binddir = Qubes.bind_dirs(
         '90-nextcloud-php-fpm',
         directories=["/etc/php-fpm.d/nextcloud-custom.conf"],
@@ -247,7 +258,7 @@ php_admin_value[upload_temp_dir] = /var/tmp
     s1 = Service.running(
         "httpd",
         watch=[h],
-        require=[b],
+        require=[b, logsbind],
     ).requisite
     s2 = Service.running(
         "php-fpm",
@@ -291,34 +302,41 @@ php_admin_value[upload_temp_dir] = /var/tmp
             pattern=".CONFIG[[].trusted_domains.[]].*",
             repl=f"$CONFIG['trusted_domains'] = array({arr});",
             append_if_not_found=True,
-            require=[setup],
+            require=[setup, logsbind],
         ).requisite
         arr = ", ".join(f"{n} => '{td}'" for n, td in enumerate(context["trusted_proxies"]))
-        r1 = File.replace(
+        r2 = File.replace(
             "trusted_proxies setting",
             name="/etc/nextcloud/config.php",
             pattern=".CONFIG[[].trusted_proxies.[]].*",
             repl=f"$CONFIG['trusted_proxies'] = array({arr});",
             append_if_not_found=True,
-            require=[setup],
+            require=[r1],
         ).requisite
         primarydomain = context["trusted_domains"][0]
-        r2 = File.replace(
+        r3 = File.replace(
             "overwrite.cli.url setting",
             name="/etc/nextcloud/config.php",
             pattern=".CONFIG[[].overwrite.cli.url.[]].*",
             repl=f"$CONFIG['overwrite.cli.url'] = 'http://{primarydomain}';",
             append_if_not_found=True,
-            require=[r1],
+            require=[r2],
         ).requisite
-        r3 = File.replace(
+        r4 = File.replace(
             "rewritebase setting",
             name="/etc/nextcloud/config.php",
             pattern=".CONFIG[[].htaccess.RewriteBase.[]].*",
             repl=f"$CONFIG['htaccess.RewriteBase'] = '/';",
             append_if_not_found=True,
-            require=[r2],
+            require=[r3],
         ).requisite
         # not currently managed:
         # * log_level
         # * enabledPreviewProviders (not in pillar either)
+        # * default_phone_region
+        # * maintenance_window_start
+        # hardcoded:
+        #  'log_type' => 'file',
+        #  'log_type_audit' => 'file',
+        #  'logfile' => '/var/log/nextcloud/general.log',
+        #  'logfile_audit' => '/var/log/nextcloud/audit.log',
