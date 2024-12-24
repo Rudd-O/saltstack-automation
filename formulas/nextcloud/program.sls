@@ -6,7 +6,9 @@ from salt://lib/qubes.sls import template, fully_persistent_or_physical
 
 
 if fully_persistent_or_physical():
-    with Pkg.installed("nextcloud", pkgs=["nextcloud", "libreoffice-core"]):
+    include("rpmfusion")
+    ffmpeg = Pkg.installed("ffmpeg").requisite
+    with Pkg.installed("nextcloud", pkgs=["nextcloud", "libreoffice-core"], require=[ffmpeg]):
         q1 = Qubes.enable_dom0_managed_service("httpd.socket", qubes_service_name="httpd").requisite
         q2 = Qubes.enable_dom0_managed_service("nextcloud-cron.timer", qubes_service_name="nextcloud-cron").requisite
         q3 = Qubes.enable_dom0_managed_service("php-fpm", qubes_service_name="php-fpm").requisite
