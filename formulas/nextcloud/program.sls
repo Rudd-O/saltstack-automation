@@ -51,7 +51,21 @@ Redirect 301 /.well-known/webdav     /remote.php/dav/
 Redirect 301 /.well-known/webfinger  /index.php/.well-known/webfinger
 Redirect 301 /.well-known/nodeinfo   /index.php/.well-known/nodeinfo
 
+# LogLevel alert rewrite:trace3
+
 <Directory /usr/share/nextcloud/>
+    # The following was inserted to prevent bots from accessing
+    # nonsense which then generates spam logs.
+    <IfModule mod_rewrite.c>
+        RewriteRule sitemap.xml$ - [R=404,L]
+        RewriteRule cgi-bin.* - [R=404,L]
+        RewriteRule \.git.* - [R=404,L]
+        RewriteRule \.env.* - [R=404,L]
+        RewriteRule abc\.png$ - [R=404,L]
+        # If the profiler is enabled, this rule must be deleted.
+        RewriteRule _profiler.* - [R=404,L]
+    </IfModule>
+
     Include conf.d/nextcloud-auth-any.inc
     Include conf.d/nextcloud-defaults.inc
     <FilesMatch ^(\.|autotest|occ|issue|indie|db_|console).*>
