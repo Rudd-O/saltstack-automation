@@ -16,9 +16,9 @@ def _runas(cmd, user, use_subprocess=False):
             return __salt__["cmd.run"](cmd)
     with open(os.devnull) as devnull:
         if user is not None:
-            return subprocess.run("su - %s -c %s" % (shlex.quote(user), shlex.quote(cmd)), shell=True, stdin=devnull, capture_output=True)
+            return subprocess.run("su - %s -c %s" % (shlex.quote(user), shlex.quote(cmd)), shell=True, stdin=devnull, capture_output=True, text=True)
         else:
-            return subprocess.run(cmd, shell=True, stdin=devnull, capture_output=True)
+            return subprocess.run(cmd, shell=True, stdin=devnull, capture_output=True, text=True)
 
 
 
