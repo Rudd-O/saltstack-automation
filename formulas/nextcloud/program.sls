@@ -7,11 +7,12 @@ from salt://lib/qubes.sls import template, fully_persistent_or_physical
 from salt://lib/copr.sls import copr
 
 TMPDIR = "/var/tmp/nextcloud"
+MEM = "4G"
 memories_index_arguments = "-g Parents"
 preview_generator_arguments = "Rudd-O Lidia"
 
 def occ(cmd):
-    return f"nice -n 20 /usr/bin/php -d sys_temp_dir={TMPDIR} -d upload_temp_dir={TMPDIR} -d memory_limit=4G -f /usr/share/nextcloud/occ {cmd}"
+    return f"nice -n 20 /usr/bin/php -d sys_temp_dir={TMPDIR} -d upload_temp_dir={TMPDIR} -d memory_limit={MEM} -f /usr/share/nextcloud/occ {cmd}"
 
 def timer_driven_unit(name, description, command, onbootsec, onunitinactivesec, require=None, watch=None, type=None):
     if fully_persistent_or_physical():
@@ -126,6 +127,17 @@ if fully_persistent_or_physical():
         require=[nextcloud],
     ).requisite
     cronqubified = Qubes.enable_dom0_managed_service(f"nextcloud-cron.timer", qubes_service_name="nextcloud-cron", require=[nextcloud]).requisite
+    cron = File.managed(
+        "Up limits of nextcloud-cron.service",
+        name="/etc/systemd/system/nextcloud-cron.service.d/limits.conf",
+        contents=dedent(f"""\
+        [Service]
+        ExecStart=
+        ExecStart=/usr/bin/php -d sys_temp_dir={TMPDIR} -d upload_temp_dir={TMPDIR} -d memory_limit={MEM} -f /usr/share/nextcloud/cron.php
+        """),
+        require=cronqubified,
+        makedirs=True,
+    ).requisite
     fpmsettings = File.managed(
         "/etc/systemd/system/php-fpm.service.d/noprivatetmp.conf",
         makedirs=True,
@@ -139,6 +151,7 @@ else:
     nextcloud = Test.nop("nextcloud").requisite
     fpmsettings = Test.nop("/etc/systemd/system/php-fpm.service.d/noprivatetmp.conf", require=[nextcloud]).requisite
     tmpfilesd = Test.nop("/etc/tmpfiles.d/nextcloud.conf", require=[nextcloud]).requisite
+    cron = Test.nop("Up limits of nextcloud-cron.service", require=[nextcloud]).requisite    
 
 
 external_notify_s, external_notify_q, external_notify_r = service_driven_unit(
@@ -147,7 +160,7 @@ external_notify_s, external_notify_q, external_notify_r = service_driven_unit(
     f"""/usr/bin/bash -c 'for a in $(/usr/share/nextcloud/occ files_external:list --all | grep -E "^[|] [0-9]+.*SMB/CIFS" | cut -d " " -f 2) ; do {occ('files_external:notify')} $a & sleep 0.5 ; done ; wait'""",
     "php-fpm.service",
     "php-fpm.service",
-    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified],
+    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, cron],
     type="exec",
 )
 scan_s, scan_t, scan_q, scan_r = timer_driven_unit(
@@ -156,7 +169,7 @@ scan_s, scan_t, scan_q, scan_r = timer_driven_unit(
     occ("files:scan --all --unscanned"),
     "2min",
     "5min",
-    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified],
+    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, cron],
     type="oneshot",
 )
 scanf_s, scanf_t, scanf_q, scanf_r = timer_driven_unit(
@@ -165,7 +178,7 @@ scanf_s, scanf_t, scanf_q, scanf_r = timer_driven_unit(
     occ("files:scan --all"),
     "2hr",
     "6hr",
-    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified],
+    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, cron],
     type="oneshot",
 )
 appdata_s, appdata_t, appdata_q, appdata_r = timer_driven_unit(
@@ -174,7 +187,7 @@ appdata_s, appdata_t, appdata_q, appdata_r = timer_driven_unit(
     occ("files:scan-app-data"),
     "13hr",
     "24hr",
-    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified],
+    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, cron],
     type="oneshot",
 )
 cleanup_s, cleanup_t, cleanup_q, cleanup_r = timer_driven_unit(
@@ -183,17 +196,21 @@ cleanup_s, cleanup_t, cleanup_q, cleanup_r = timer_driven_unit(
     occ("files:cleanup"),
     "2day",
     "7day",
-    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified],
+    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, cron],
     type="oneshot",
 )
+noscan = File.absent(
+    "/etc/systemd/system/nextcloud-external-scan.service.wants/nextcloud-memories-index.service",
+    require=scanf_s,
+).requisite
 memories_index_s, memories_index_q, memories_index_r = service_driven_unit(
     "nextcloud-memories-index",
     "Nextcloud indexing for Memories app",
     occ(f"memories:index {memories_index_arguments}"),
-    "nextcloud-external-scan.service",
-    "nextcloud-external-scan.service",
+    "nextcloud-external-scan-full.service",
+    "nextcloud-external-scan-full.service",
     start_manually=False,
-    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified],
+    require=[scanf_s, noscan],
     type="exec",
 )
 generate_previews_s, generate_previews_q, generate_previews_r = service_driven_unit(
@@ -203,7 +220,7 @@ generate_previews_s, generate_previews_q, generate_previews_r = service_driven_u
     "nextcloud-external-scan.service",
     "nextcloud-external-scan.service",
     start_manually=False,
-    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified],
+    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, cron],
     type="exec",
 )
 facerecognition_s, facerecognition_t, facerecognition_q, facerecognition_r = timer_driven_unit(
@@ -212,17 +229,17 @@ facerecognition_s, facerecognition_t, facerecognition_q, facerecognition_r = tim
     occ("face:background_job -t 550"),
     "10min",
     "10min",
-    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified],
+    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, cron],
     type="exec",
 )
 
-_o = [scan_s, scan_t, scanf_s, scanf_t, appdata_s, appdata_t, cleanup_s, cleanup_t, memories_index_s, generate_previews_s, facerecognition_s, facerecognition_t, external_notify_s]
+_o = [scan_s, scan_t, scanf_s, scanf_t, noscan, appdata_s, appdata_t, cleanup_s, cleanup_t, memories_index_s, generate_previews_s, facerecognition_s, facerecognition_t, external_notify_s]
 _q = [scan_q, scanf_q, appdata_q, cleanup_q, memories_index_q, generate_previews_q, facerecognition_q, external_notify_q]
 _s = [scan_r, scanf_r, appdata_r, cleanup_r, memories_index_r, generate_previews_r, facerecognition_r, external_notify_r]
 reload_ = Cmd.run(
     f"reload systemd for {sls}",
     name="systemctl --system daemon-reload",
-    onchanges=_o,
+    onchanges=_o + [cron],
     require_in=_q + _s,
 ).requisite
 
@@ -339,6 +356,7 @@ Redirect 301 /.well-known/nodeinfo   /index.php/.well-known/nodeinfo
         require=[t],
     ).requisite
     context["temp_directory"] = context.get("temp_directory", TMPDIR)
+    context["memory_limit"] = context.get("memory_limit", MEM)
     tmpdir = File.directory(
         TMPDIR,
         user="apache",
@@ -354,7 +372,7 @@ Redirect 301 /.well-known/nodeinfo   /index.php/.well-known/nodeinfo
     phpsettings = File.managed(
         "/etc/php-fpm.d/nextcloud-custom.conf",
         contents="""[nextcloud]
-php_admin_value[memory_limit] = 4G
+php_admin_value[memory_limit] = {{ memory_limit }}
 php_admin_value[opcache.jit] = 1255
 php_admin_value[opcache.jit_buffer_size] = 8M
 php_admin_value[opcache.interned_strings_buffer] = 64
