@@ -89,7 +89,7 @@ def restart_services(test=False, exclude_services_globs=None, exclude_paths=None
     with open(os.devnull, "a") as f:
         # Optimistically run the unit state collector, ignoring errors.
         subprocess.call(
-            "systemctl --system start --no-block systemd-unit-state-collector".split(),
+            "systemctl --system restart --no-block systemd-unit-state-collector".split(),
             stdin=None,
             stdout=f,
             stderr=f,

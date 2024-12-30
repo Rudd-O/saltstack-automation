@@ -1,5 +1,11 @@
 #!/bin/bash -e
 
+outfile="$1"
+echo "$outfile" | grep -q "/" || {
+  dir=$(cat /proc/$(pgrep -f /usr/bin/node_exporter | head -1)/cmdline | tr '\0' '\n' | grep -- --collector.textfile.directory= | sed 's/^--collector.textfile.directory=//')
+  outfile="$dir/$outfile"
+}
+
 start=$(date +%s.%N)
 
 services=$(
@@ -12,7 +18,7 @@ declare -A DATA
 for service in $services ; do
   move=1
   if [ -z ${DATA[$service]} ] ; then
-    echo "services_pending_restart{service=\"$service\"} 1" >> "$1".$$
+    echo "services_pending_restart{service=\"$service\"} 1" >> "$outfile".$$
     DATA["$service"]=1
   fi
 done
@@ -20,9 +26,9 @@ done
 end=$(date +%s.%N)
 
 #if [ "$move" == "1" ] ; then
-  echo "needs_restart_collector_start_time_seconds $start" >> "$1".$$
-  echo "needs_restart_collector_end_time_seconds $end" >> "$1".$$
-  mv -f "$1".$$ "$1"
+  echo "needs_restart_collector_start_time_seconds $start" >> "$outfile".$$
+  echo "needs_restart_collector_end_time_seconds $end" >> "$outfile".$$
+  mv -f "$outfile".$$ "$outfile"
 #else
-#  rm -f "$1"
+#  rm -f "$outfile"
 #fi

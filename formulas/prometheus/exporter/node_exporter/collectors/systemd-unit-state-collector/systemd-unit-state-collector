@@ -20,6 +20,10 @@ def atomic_outputter(filename):
             filename = "/dev/stdout"
         tmpf, finalf = filename, filename
     else:
+        if not os.path.sep in filename:
+            cmd = "cat /proc/$(pgrep -f /usr/bin/node_exporter | head -1)/cmdline | tr '\\0' '\\n' | grep -- --collector.textfile.directory= | sed 's/^--collector.textfile.directory=//'"
+            directory = subprocess.check_output(["bash", "-c", cmd], text=True).rstrip("\n")
+            filename = os.path.join(directory, filename)
         tmpf, finalf = filename + ".%s" % os.getpid(), filename
     with open(tmpf, "w") as out:
         try:
