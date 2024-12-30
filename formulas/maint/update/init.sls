@@ -7,7 +7,7 @@ from salt://maint/config.sls import config
 
 if fully_persistent_or_physical() or dom0():
     tpl = "set -x ; mkdir -p /var/cache/salt/zfs-dkms ; test -f /var/cache/salt/zfs-dkms/%(stage)s || { rpm -qa | grep zfs-dkms > /var/cache/salt/zfs-dkms/%(stage)s ; } ; echo ; echo changed=no ; exit 0"
-    if grains("os") in ["Fedora", "Qubes"]:
+    if grains("os") in ["Fedora", "Qubes", "Qubes OS"]:
         include("needs-restart")
     Cmd.run(
         "check ZFS module before",
@@ -21,7 +21,7 @@ if fully_persistent_or_physical() or dom0():
 
     freq = flatpak_updated(require=updreq)
 
-    if grains("os") in ["Fedora", "Qubes"]:
+    if grains("os") in ["Fedora", "Qubes", "Qubes OS"]:
         rest = Maint.services_restarted(
             "Restart services",
             require=[updreq, Test("needs-restart deployed")],
