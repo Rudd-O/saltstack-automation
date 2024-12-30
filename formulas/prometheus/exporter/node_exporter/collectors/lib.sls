@@ -23,7 +23,7 @@ def collector(n, ext=None):
     File.absent(oldexe)
 
     if updateable():
-        selinux_state = __salt__["selinux.getenforce"]()
+        selinux_state = __salt__["file.file_exists"]("/usr/sbin/semanage") and __salt__["selinux.getenforce"]()
         selinux = {
             "seuser": "system_u",
             "serole": "object_r",
