@@ -8,26 +8,5 @@ name = "node_exporter"
 textfile_directory = config.paths.textfile_directory
 
 milestone = Test.nop("Collector directory created").requisite
-
-if updateable():
-    File.directory(
-        textfile_directory,
-        mode="0750",
-        user="root",
-        group="prometheus",
-        require_in=[milestone],
-    )
-else:
-    with File.directory(
-        textfile_directory,
-        mode="0750",
-        user="root",
-        group="prometheus",
-        watch_in=[milestone],
-    ):
-        q = Qubes.bind_dirs(
-            f'{name} collector directory',
-            name="node_exporter-collector",
-            directories=[textfile_directory],
-            watch_in=[milestone],
-        ).requisite
+absent = Qubes.unbind_dirs(f'{name} collector directory', name="node_exporter-collector", directories=["/var/lib/node_exporter"], require_in=[milestone]).requisite
+File.absent("Delete bound dir for node exporter", name="/rw/bind-dirs/var/lib/node_exporter", require=[absent], require_in=[milestone])
