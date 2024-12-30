@@ -199,6 +199,7 @@ def KnownHostForUser(id_, host, known_host_keys, **kwargs):
                 )
     return before.requisite, after.requisite
 
+
 def ReloadSystemdOnchanges(sls_name):
     # Returns the requisite directly.
     return Cmd.run(
@@ -206,3 +207,27 @@ def ReloadSystemdOnchanges(sls_name):
         name="systemctl --system daemon-reload",
         onchanges=[Test.nop(f"Noop for systemctl --system daemon-reload for {sls_name}").requisite],
     ).requisite
+
+
+def SystemdSystemDropin(service_name, dropin_name, contents, require=None, watch_in=None, onchanges_in=None):
+    if not any(service_name.endswith("." + x) for x in "service socket device mount automount swap target path timer slice scope".split()):
+        service_name = service_name + ".service"
+    fn = f"/etc/systemd/system/{service_name}.d/{dropin_name}.conf"
+    reloadsystemd = ReloadSystemdOnchanges(fn)
+    kws = {}
+    if watch_in:
+        kws["watch_in"] = watch_in
+    if require:
+        kws["require"] = require
+    if onchanges_in:
+        kws["onchanges_in"] = [reloadsystemd] + onchanges_in
+    else:
+        kws["onchanges_in"] = [reloadsystemd]
+    file_ = File.managed(
+        fn,
+        contents=contents,
+        mode="0644",
+        makedirs=True,
+        **kws,
+    ).requisite
+    return (file_, reloadsystemd)
