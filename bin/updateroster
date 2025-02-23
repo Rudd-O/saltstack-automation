@@ -10,8 +10,9 @@ import fcntl
 import collections
 import copy
 import os
-import yaml
+import subprocess
 import sys
+import yaml
 
 
 try:
@@ -26,6 +27,7 @@ dom0s_file = os.path.join(pillar_dir, "qubes", "dom0s.sls")
 physical_hosts_file = os.path.join(pillar_dir, "homenetwork", "from_roster.sls")
 vm_templates_file = os.path.join(pillar_dir, "qubes", "vm_templates.sls")
 vms_file = os.path.join(pillar_dir, "qubes", "vms.sls")
+dep_ordering_file = os.path.join(pillar_dir, "qubes", "vm_start_order.sls")
 
 
 def _generate_tree(roster, attr):
@@ -106,6 +108,26 @@ def generate_vms(roster):
     return g
 
 
+def generate_dep_ordering(roster):
+    g = {"qubes": {"vm_start_order": {}}}
+    gg = g["qubes"]["vm_start_order"]
+    for minion_id, data in roster.items():
+        dom0 = data.get("dom0")
+        if not dom0:
+            continue
+        if dom0 not in gg:
+            gg[dom0] = {}
+        ggg = gg[dom0]
+        deps = set()
+        if m := data.get("vm_netvm"):
+            deps.add(m)
+        if m := data.get("after"):
+            for x in m:
+                deps.add(x)
+        ggg[minion_id] = list(deps)
+    return g
+
+
 def generate_vm_templates(roster):
     x = _generate_tree(roster, "vm_template")
     g = {"qubes": {"vm_templates": {}}}
@@ -132,7 +154,7 @@ def recursively_fix_allbools(d):
     return d
 
 
-def check_roster(roster, dom0s, vm_templates, unused_vms):
+def check_roster(roster, dom0s, vm_templates, unused_vms, dep_tree):
     for roster_item, data in roster.items():
         if "connection_type" in data or "vm_class" in data:
             if "." in roster_item:
@@ -177,6 +199,20 @@ def check_roster(roster, dom0s, vm_templates, unused_vms):
                     data["dom0"] == dom0s["qubes"]["dom0s"][data["vm_template"]]
                 ), roster_item
 
+    for dom0, vms in dep_tree["qubes"]["vm_start_order"].items():
+        tsort_lines = []
+        for after, befores in vms.items():
+            if not befores:
+                continue
+            after_domain = after.partition(".")[2]
+            for before in befores:
+                before_domain = before.partition(".")[2]
+                assert after_domain == before_domain, f"no cross-dom0 dependency support: domain of {after} must be the same as domain of {before}"
+                tsort_lines.append(f"{before} {after}")
+        inp = "\n".join(tsort_lines) + "\n"
+        tsort = subprocess.run(["tsort"], input=inp, text=True, capture_output=True)
+        assert not tsort.stderr, "tsort returned dependency cycle {tsort.stderr}"
+
 
 lockf = roster_file + ".lock"
 with open(lockf, "w") as fd:
@@ -191,12 +227,16 @@ with open(lockf, "w") as fd:
         dom0s = recursively_fix_allbools(generate_dom0s(roster))
         vm_templates = recursively_fix_allbools(generate_vm_templates(roster))
         vms = recursively_fix_allbools(generate_vms(roster))
+        dep_ordering = recursively_fix_allbools(generate_dep_ordering(roster))
 
-        check_roster(roster, dom0s, vm_templates, vms)
+        check_roster(roster, dom0s, vm_templates, vms, dep_ordering)
 
         def safe_write(fn, content):
-            with open(fn, "r") as existing_fd:
-                existing_content = existing_fd.read()
+            try:
+                with open(fn, "r") as existing_fd:
+                    existing_content = existing_fd.read()
+            except FileNotFoundError:
+                existing_content = ""
             if content != existing_content:
                 with open(fn + ".tmp", "w+") as fd:
                     fd.write(content)
@@ -217,6 +257,7 @@ with open(lockf, "w") as fd:
             (dom0s_file, dom0s),
             (vm_templates_file, vm_templates),
             (vms_file, vms),
+            (dep_ordering_file, dep_ordering),
         ]:
             safe_write(output_file, stub + yaml.dump(output))
 
