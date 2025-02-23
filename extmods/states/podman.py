@@ -45,7 +45,7 @@ def _runas_wrap(cmd, runas=None):
     return ["su", "-", runas, "-s", "/bin/bash", "-c", shlex.join(cmd)]
 
 
-def present(name, image, options=None, dryrun=False, enable=None, runas=None):
+def present(name, image, options=None, dryrun=False, enable=None, runas=None, args=None):
     """
     Creates a container with a name, and runs it under systemd.
 
@@ -80,6 +80,7 @@ def present(name, image, options=None, dryrun=False, enable=None, runas=None):
             option = "-" + option if len(option) < 2 else "--" + option
             cmd.extend([option])
     cmd += [image]
+    cmd += [] if not args else args
 
     if dryrun:
         if not container_exists:
@@ -203,6 +204,98 @@ def present(name, image, options=None, dryrun=False, enable=None, runas=None):
         changes=dict((r["name"], r["changes"]) for r in rets if r["changes"]),
     )
 
+from salt.states.service import _get_systemd_only
+from salt.exceptions import CommandExecutionError
+
+def mod_watch(
+    name,
+    sfun=None,
+    sig=None,
+    reload=False,
+    full_restart=False,
+    init_delay=None,
+    force=False,
+    **kwargs
+):
+    # import pprint
+    # assert 0, pprint.pformat((name, sfun, sig, reload, full_restart, init_delay, force, kwargs))
+
+    ret = {"name": name, "changes": {}, "result": True, "comment": ""}
+    past_participle = None
+
+    status_kwargs, warnings = _get_systemd_only(__salt__["service.status"], kwargs)
+    if warnings:
+        _add_warnings(ret, warnings)
+
+    #if sfun == "dead":
+    #    verb = "stop"
+    #    past_participle = verb + "ped"
+    #    if __salt__["service.status"](name, sig, **status_kwargs):
+    #        func = __salt__["service.stop"]
+    #    else:
+    #        ret["result"] = True
+    #        ret["comment"] = "Service is already {}".format(past_participle)
+    #        return ret
+    if sfun == "present":
+        name = f"container-{name}"
+        ret["name"] = name
+        if __salt__["service.status"](name, sig, **status_kwargs):
+            if "service.reload" in __salt__ and reload:
+                if "service.force_reload" in __salt__ and force:
+                    func = __salt__["service.force_reload"]
+                    verb = "forcefully reload"
+                else:
+                    func = __salt__["service.reload"]
+                    verb = "reload"
+            elif "service.full_restart" in __salt__ and full_restart:
+                func = __salt__["service.full_restart"]
+                verb = "fully restart"
+            else:
+                func = __salt__["service.restart"]
+                verb = "restart"
+        else:
+            func = __salt__["service.start"]
+            verb = "start"
+        if not past_participle:
+            past_participle = verb + "ed"
+    else:
+        ret["comment"] = "Unable to trigger watch for service.{}".format(sfun)
+        ret["result"] = False
+        return ret
+
+    if __opts__["test"]:
+        ret["result"] = None
+        ret["comment"] = "Service is set to be {}".format(past_participle)
+        return ret
+
+    if verb == "start" and "service.stop" in __salt__:
+        # stop service before start
+        __salt__["service.stop"](name)
+
+    func_kwargs, warnings = _get_systemd_only(func, kwargs)
+    if warnings:
+        _add_warnings(ret, warnings)
+
+    try:
+        result = func(name, **func_kwargs)
+    except CommandExecutionError as exc:
+        ret["result"] = False
+        ret["comment"] = exc.strerror
+        return ret
+
+    if init_delay:
+        time.sleep(init_delay)
+
+    ret["changes"] = {name: result}
+    ret["result"] = result
+    ret["comment"] = (
+        "Service {}".format(past_participle)
+        if result
+        else "Failed to {} the service".format(verb)
+    )
+    return ret
+
+
 def _make_container_command(options, pod_name=None):
     cmd = ["podman", "container", "create"]
     if pod_name is not None:
@@ -259,6 +352,8 @@ def pod_running(name, options, containers, dryrun=False, enable=None):
         o = co(["podman", "pod", "inspect", name])
         pod_exists = True
         v = json.loads(o)
+        if isinstance(v, list):
+            v = v[0]
         existing_cmd = v["CreateCommand"]
     except CalledProcessError:
         pod_exists = False
@@ -450,6 +545,8 @@ def _absent_or_dead(name, mode, container_or_pod="container", runas=None):
         o = co(["podman", container_or_pod, "inspect", name])
         container_exists = True
         v = json.loads(o)
+        if isinstance(v, list):
+            v = v[0]
         if container_or_pod == "container":
             is_running = v[0]["State"]["Running"]
         else:
