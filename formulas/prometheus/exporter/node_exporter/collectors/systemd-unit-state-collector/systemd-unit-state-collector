@@ -21,8 +21,11 @@ def atomic_outputter(filename):
         tmpf, finalf = filename, filename
     else:
         if not os.path.sep in filename:
-            cmd = "cat /proc/$(pgrep -f /usr/bin/node_exporter | head -1)/cmdline | tr '\\0' '\\n' | grep -- --collector.textfile.directory= | sed 's/^--collector.textfile.directory=//'"
+            cmd = "cat /proc/$(pgrep -f ^/usr/bin/node_exporter | head -1)/cmdline | tr '\\0' '\\n' | grep -- --collector.textfile.directory= | sed 's/^--collector.textfile.directory=//'"
             directory = subprocess.check_output(["bash", "-c", cmd], text=True).rstrip("\n")
+            if not directory:
+                print("Exiting because there is no node_exporter from which to infer the collector directory yet.", file=sys.stderr)
+                sys.exit(0)
             filename = os.path.join(directory, filename)
         tmpf, finalf = filename + ".%s" % os.getpid(), filename
     with open(tmpf, "w") as out:
