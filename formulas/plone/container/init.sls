@@ -190,6 +190,7 @@ def deploy(i, n, processes, data, require=None):
                 {"stop-signal": "SIGTERM"},
                 {"e": "ZEO_ADDRESS=localhost:8100"},
                 {"e": "ZEO_SHARED_BLOB_DIR=true"},
+                {"restart": "on-failure"},
                 {"v": datadir + ":/data:rw,z,shared,U"},
                 {"requires": f"{nc}-infra"},
             ]
@@ -208,11 +209,12 @@ def deploy(i, n, processes, data, require=None):
                     {"e": "ZEO_SHARED_BLOB_DIR=true"},
                     {"e": f"LISTEN_PORT={lp}"},
                     {"v": join(datadir, "blobstorage") + ":/data/blobstorage:rw,z,shared,U"},
+                    {"restart": "on-failure"},
                     {"health-cmd": f"wget -O/dev/null http://127.0.0.1:{lp}"},
                     {"health-interval": "15s"},
-                    {"health-retries": "3"},
-                    {"health-start-period": "2s"},
-                    {"health-timeout": "60s"},
+                    {"health-retries": "5"},
+                    {"health-start-period": "60s"},
+                    {"health-timeout": "5s"},
                 ],
             )
             if nn == 0:
