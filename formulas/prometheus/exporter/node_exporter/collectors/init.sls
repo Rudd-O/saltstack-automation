@@ -1,7 +1,5 @@
 #!objects
 
-from salt://lib/qubes.sls import updateable
-
 
 if grains("os") in ("Fedora", "Qubes", "Qubes OS"):
     include(sls + ".needs-restart-collector")
