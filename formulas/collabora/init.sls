@@ -51,3 +51,23 @@ Podman.present(
 #    runas=username,
     require=[p], #, subuid, subgid],
 )
+
+Podman.present(
+    "collabora-code",
+    image=f"registry.hub.docker.com/collabora/code",
+    options=[
+        {"e":
+            "extra_params=--o:ssl.enable=false"
+            " --o:ssl.termination=true"
+            " --o:net.service_root=/collabora"
+        },
+        {"network": "host"},
+        {"cap-add": "MKNOD"},
+        #{"subuidname": username},
+        #{"subgidname": username},
+        #{"security-opt": "unmask=/proc/*"},
+    ],
+    enable=True,
+#    runas=username,
+    require=[p], #, subuid, subgid],
+)

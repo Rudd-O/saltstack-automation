@@ -138,6 +138,18 @@ if fully_persistent_or_physical():
         require=cronqubified,
         makedirs=True,
     ).requisite
+    fastercron = File.managed(
+        "More frequent nextcloud-cron.service",
+        name="/etc/systemd/system/nextcloud-cron.timer.d/faster.conf",
+        contents=dedent(f"""\
+        [Timer]
+        OnUnitInactiveSec=
+        OnBootSec=3min
+        OnUnitInactiveSec=5min
+        """),
+        require=cronqubified,
+        makedirs=True,
+    ).requisite
     fpmsettings = File.managed(
         "/etc/systemd/system/php-fpm.service.d/noprivatetmp.conf",
         makedirs=True,
@@ -151,8 +163,9 @@ else:
     nextcloud = Test.nop("nextcloud").requisite
     fpmsettings = Test.nop("/etc/systemd/system/php-fpm.service.d/noprivatetmp.conf", require=[nextcloud]).requisite
     tmpfilesd = Test.nop("/etc/tmpfiles.d/nextcloud.conf", require=[nextcloud]).requisite
-    cron = Test.nop("Up limits of nextcloud-cron.service", require=[nextcloud]).requisite    
-
+    cron = Test.nop("Up limits of nextcloud-cron.service", require=[nextcloud]).requisite
+    fastercron = Test.nop("More frequent nextcloud-cron.service", require=[nextcloud]).requisite
+    cronqubified = Test.nop("Qubification of nextcloud-cron.timer", require=[nextcloud]).requisite
 
 external_notify_s, external_notify_q, external_notify_r = service_driven_unit(
     "nextcloud-external-notify",
@@ -160,7 +173,7 @@ external_notify_s, external_notify_q, external_notify_r = service_driven_unit(
     f"""/usr/bin/bash -c 'for a in $(/usr/share/nextcloud/occ files_external:list --all | grep -E "^[|] [0-9]+.*SMB/CIFS" | cut -d " " -f 2) ; do {occ('files_external:notify')} $a & sleep 0.5 ; done ; wait'""",
     "php-fpm.service",
     "php-fpm.service",
-    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, cron],
+    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, fastercron, cron],
     type="exec",
 )
 scan_s, scan_t, scan_q, scan_r = timer_driven_unit(
@@ -169,7 +182,7 @@ scan_s, scan_t, scan_q, scan_r = timer_driven_unit(
     occ("files:scan --all --unscanned"),
     "2min",
     "5min",
-    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, cron],
+    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, fastercron, cron],
     type="oneshot",
 )
 scanf_s, scanf_t, scanf_q, scanf_r = timer_driven_unit(
@@ -178,7 +191,7 @@ scanf_s, scanf_t, scanf_q, scanf_r = timer_driven_unit(
     occ("files:scan --all"),
     "2hr",
     "6hr",
-    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, cron],
+    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, fastercron, cron],
     type="oneshot",
 )
 appdata_s, appdata_t, appdata_q, appdata_r = timer_driven_unit(
@@ -187,7 +200,7 @@ appdata_s, appdata_t, appdata_q, appdata_r = timer_driven_unit(
     occ("files:scan-app-data"),
     "13hr",
     "24hr",
-    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, cron],
+    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, fastercron, cron],
     type="oneshot",
 )
 cleanup_s, cleanup_t, cleanup_q, cleanup_r = timer_driven_unit(
@@ -196,7 +209,7 @@ cleanup_s, cleanup_t, cleanup_q, cleanup_r = timer_driven_unit(
     occ("files:cleanup"),
     "2day",
     "7day",
-    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, cron],
+    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, fastercron, cron],
     type="oneshot",
 )
 noscan = File.absent(
@@ -220,7 +233,7 @@ generate_previews_s, generate_previews_q, generate_previews_r = service_driven_u
     "nextcloud-external-scan.service",
     "nextcloud-external-scan.service",
     start_manually=False,
-    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, cron],
+    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, fastercron, cron],
     type="exec",
 )
 facerecognition_s, facerecognition_t, facerecognition_q, facerecognition_r = timer_driven_unit(
@@ -229,7 +242,7 @@ facerecognition_s, facerecognition_t, facerecognition_q, facerecognition_r = tim
     occ("face:background_job -t 550"),
     "10min",
     "10min",
-    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, cron],
+    require=[nextcloud, tmpfilesd, fpmsettings, cronqubified, fastercron, cron],
     type="exec",
 )
 
@@ -243,9 +256,48 @@ reload_ = Cmd.run(
     require_in=_q + _s,
 ).requisite
 
+
+before_selinux = Test.nop("Before SELinux", require=[nextcloud]).requisite
+after_selinux = Test.nop("After SELinux").requisite
+
+if grains("selinux:enabled"):
+    Selinux.boolean(
+        "httpd_can_network_connect for Nextcloud",
+        name="httpd_can_network_connect",
+        value=True,
+        persist=True,
+        require=[before_selinux],
+        require_in=[after_selinux],
+    )
+    Selinux.boolean(
+        "httpd_use_cifs for Nextcloud",
+        name="httpd_use_cifs",
+        value=True,
+        persist=True,
+        require=[before_selinux],
+        require_in=[after_selinux],
+    )
+    Customselinux.policy_module_present(
+        "nextcloud-fixes",
+        contents="""
+module nextcloud-fixes 1.0;
+
+require {
+	type httpd_t;
+	type initrc_t;
+	class key read;
+}
+
+allow httpd_t initrc_t:key read;
+""".strip(),
+        require=[before_selinux],
+        require_in=[after_selinux],
+    ).requisite
+
+
 if not template():
     context = pillar("nextcloud", {})
-    t = Test.nop("Nextcloud begin setup", require=[nextcloud]).requisite
+    t = Test.nop("Nextcloud begin setup", require=[nextcloud, after_selinux]).requisite
     h = File.managed(
         "/etc/httpd/conf.d/z-nextcloud-access.conf",
         contents=r"""
@@ -281,6 +333,9 @@ Redirect 301 /.well-known/nodeinfo   /index.php/.well-known/nodeinfo
 # LogLevel alert rewrite:trace3
 
 <Directory /usr/share/nextcloud/>
+    LogLevel info
+    LimitRequestBody 0
+    # LogLevel info proxy_fcgi:debug
     # The following was inserted to prevent bots from accessing
     # nonsense which then generates spam logs.
     <IfModule mod_rewrite.c>
@@ -308,6 +363,8 @@ Redirect 301 /.well-known/nodeinfo   /index.php/.well-known/nodeinfo
     # This applies to /usr/share/nextcloud, of course.
     ErrorDocument 403 /index.php/error/403
     ErrorDocument 404 /index.php/error/404
+    # echo '<?php phpinfo() ?>' > /usr/share/nextcloud/info.php
+    #    RewriteCond %{REQUEST_FILENAME} !/info\.php
     <IfModule mod_rewrite.c>
         Options -MultiViews
         RewriteRule ^core/js/oc.js$ index.php [PT,E=PATH_INFO:$1]
@@ -363,6 +420,9 @@ Redirect 301 /.well-known/nodeinfo   /index.php/.well-known/nodeinfo
         group="apache",
         mode="0770",
         require=[t, tmpfilesd],
+        selinux={
+            "type": "tmp_t",
+        },
     ).requisite
     tmpdir_bind = Qubes.bind_dirs(
         '90-nextcloud-tmp',
@@ -380,6 +440,7 @@ php_admin_value[upload_max_filesize] = {{ max_upload_size | default("50M") }}
 php_admin_value[post_max_size] = {{ max_upload_size | default("50M") }}
 php_admin_value[sys_temp_dir] = {{ temp_directory }}
 php_admin_value[upload_temp_dir] = {{ temp_directory }}
+php_admin_value[max_execution_time] = 150
 """,
         template="jinja",
         context=context,
@@ -478,6 +539,10 @@ php_admin_value[upload_temp_dir] = {{ temp_directory }}
         # hardcoded:
         #  'log_type' => 'file',
         #  'log_type_audit' => 'file',
+        # not currently managed:
+        #   occ config:app:set dav calendarSubscriptionRefreshRate --value PT2H
+        # occ maintenance:mimetype:update-db
+        # occ maintenance:mimetype:update-js
 
     # FIXME make the config tasks above be required here.
     post_setup_config = Test.nop("Post-setup configuration", require=[setup, cachebind], require_in=_q).requisite
