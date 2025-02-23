@@ -18,6 +18,7 @@ default_exclude_services = [
     "auditd.service", # Can only be requested by dependency.
     "plymouth-start.service", # No need to restart.
     "dbus-broker.service", # Suspected of breaking reboot, node exporter and SSH login.
+    "debug-shell.service",
     "^getty@",
     "^user@",
     ".+scope$",
