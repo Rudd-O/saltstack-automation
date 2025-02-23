@@ -3,7 +3,8 @@
 
 if (
     __salt__["file.file_exists"]("/etc/selinux/config")
-    and not __salt__["file.contains"]("/etc/selinux/config", "SELINUX=disabled")
+    and __salt__["file.search"]("/etc/selinux/config", pattern="SELINUX=enforcing")
+    and "true" in __salt__["cmd.run"]("selinuxenabled && echo true || echo false")
 ):
     File.replace(
         "Set SELinux to permissive",
