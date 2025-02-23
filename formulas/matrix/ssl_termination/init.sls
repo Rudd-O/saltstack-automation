@@ -10,27 +10,27 @@ include("nginx")
 include("letsencrypt")
 
 
+if grains("selinux:enabled"):
+    Selinux.port_policy_present(
+        "httpd_can_listen_to_8448",
+        sel_type="http_port_t",
+        protocol="tcp",
+        port=8448,
+        require_in=[Service("nginx")] if not template() else [],
+    )
+    Selinux.boolean(
+        "httpd_can_network_relay for Matrix",
+        name="httpd_can_network_relay",
+        value=True,
+        persist=True,
+        require_in=[Service("nginx")] if not template() else [],
+    )
+
 if not template():
     synapse = pillar("matrix:synapse", {})
     delegated_hostname = synapse["delegated_hostname"]
     cert = fullchain_path(delegated_hostname)
     key = privkey_path(delegated_hostname)
-
-    if physical():
-        Selinux.port_policy_present(
-            "httpd_can_listen_to_8448",
-            sel_type="http_port_t",
-            protocol="tcp",
-            port=8448,
-            require_in=[Service("nginx")],
-        )
-        Selinux.boolean(
-            "httpd_can_network_relay for Matrix",
-            name="httpd_can_network_relay",
-            value=True,
-            persist=True,
-            require_in=[Service("nginx")],
-        )
 
     File.managed(
         "/etc/nginx/conf.d/vhosts/%s.conf" % delegated_hostname,
