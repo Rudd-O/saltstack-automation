@@ -28,7 +28,7 @@ nextcloud:
   # machine.local, then the URL that serves Nextcloud will 
   # be http://machine.local/ ).
   # More domains are optionally possible too.
-  - cloud.dragonfear
+  - cloud.yourserver.com
 ```
 
 ## Known issues
