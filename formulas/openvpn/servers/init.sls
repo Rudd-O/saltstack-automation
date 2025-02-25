@@ -47,6 +47,25 @@ if fully_persistent_or_physical():
 else:
     persreqs = []
 
+before_selinux = Test.nop("Before SELinux", require=persreqs).requisite
+after_selinux = Test.nop("After SELinux", require=[before_selinux]).requisite
+for port in set([data['port'] for data in config.servers.values()]):
+    Selinux.port_policy_present(
+        f"OpenVPN can listen to TCP port {port}",
+        sel_type="openvpn_port_t",
+        protocol="tcp",
+        port=port,
+        require=[before_selinux],
+        require_in=[after_selinux],
+    )
+    Selinux.port_policy_present(
+        f"OpenVPN can listen to UDP port {port}",
+        sel_type="openvpn_port_t",
+        protocol="udp",
+        port=port,
+        require=[before_selinux],
+        require_in=[after_selinux],
+    )
 
 if rw_only_or_physical():
     bind = Qubes.bind_dirs(
@@ -106,7 +125,7 @@ if rw_only_or_physical():
         s = Service.running(
             f"openvpn-server@{server} running",
             name=f"openvpn-server@{server}",
-            watch=[f, ca, crt, key, c] + persreqs,
+            watch=[f, ca, crt, key, c] + persreqs + [after_selinux],
         ).requisite
         persreqs.append(s)
 
