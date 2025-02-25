@@ -1,6 +1,7 @@
 #!objects
 
 import os
+import textwrap
 
 
 from salt://lib/qubes.sls import fully_persistent_or_physical, fully_persistent, rw_only_or_physical, rw_only
@@ -48,7 +49,29 @@ RestartSec=15s
 else:
     persreqs = []
 
+se = Customselinux.policy_module_present(
+    "wgping",
+    contents=textwrap.dedent("""\
+        module wgping 1.0;
 
+        require {
+            type ping_exec_t;
+            type wireguard_t;
+            type iptables_t;
+            class file { getattr read open execute execute_no_trans map };
+            class process { setcap noatsecure rlimitinh siginh };
+            class icmp_socket { create setopt getopt recv_msg send_msg read write };
+        }
+
+        #============= wireguard_t ==============
+        allow wireguard_t ping_exec_t:file { getattr read open execute execute_no_trans map };
+        allow wireguard_t self:process { setcap };
+        allow wireguard_t iptables_t:process { noatsecure rlimitinh siginh };
+        allow wireguard_t self:icmp_socket { create setopt getopt recv_msg send_msg read write };
+        """
+    ),
+    require=persreqs,
+).requisite
 
 if rw_only_or_physical():
     File.directory(
@@ -90,6 +113,6 @@ with Qubes.enable_dom0_managed_service(
                 f"wg-quick@{network} running",
                 name=f"wg-quick@{network}",
                 enable=True,
-                watch=[File(f"/etc/wireguard/{network}.conf")] + persreqs,
+                watch=[File(f"/etc/wireguard/{network}.conf")] + persreqs + [se],
                 require=persreqs,
             )
