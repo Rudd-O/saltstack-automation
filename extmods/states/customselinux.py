@@ -44,15 +44,10 @@ def policy_module_present(name, source=None, contents=None):
             """
 set -e
 cd /etc/selinux/targeted/local
-(
-    rm -f %(qfname)s.mod
-    checkmodule -M -m -o %(qfname)s.mod %(qfname)s.te
-    semodule_package -o %(qfname)s.pp -m %(qfname)s.mod
-) || {
-    r=$?
-    rm -f %(qfname)s.te
-    exit $?
-}
+trap 'rm -f %(qfname)s.mod %(qfname)s.te %(qfname)s.pp' EXIT
+checkmodule -M -m -o %(qfname)s.mod %(qfname)s.te
+semodule_package -o %(qfname)s.pp -m %(qfname)s.mod
+trap 'true' EXIT
 """
             % locals()
         )
