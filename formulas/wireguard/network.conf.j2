@@ -3,7 +3,8 @@ Address = {{ peers[grains.id].subnet.split(",")[0] }}
 PrivateKey = {{ privkey }}
 SaveConfig = false
 ListenPort = {{ port }}
-PostUp = {%   for c in peers.values() %}ping -c1 {{ c.subnet.split("/")[0] }} || true ; {% endfor %} /bin/true
+# Ping the known peers to hasten awakening of connectivity.
+PostUp = {%   for c in peers.values() %}ping -c1 {{ c.subnet.split("/")[0] }} || true & {% endfor %} wait
 {%- for name, c in peers.items() %}
 {%-   if name == grains.id %}{% else %}
 [Peer]
