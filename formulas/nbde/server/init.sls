@@ -6,6 +6,7 @@ from salt://prometheus/config.sls import config
 
 
 reloadsystemd = ReloadSystemdOnchanges(sls)
+port = 7500
 
 if fully_persistent_or_physical():
     p = Pkg.installed("tang").requisite
@@ -15,11 +16,11 @@ if fully_persistent_or_physical():
         require=[p]
     ).requisite
     o = File.managed(
-        "/etc/systemd/system/tangd.socket.d/listen-7500.conf",
-        contents="""
+        f"/etc/systemd/system/tangd.socket.d/listen-{port}.conf",
+        contents=f"""
 [Socket]
 ListenStream=
-ListenStream=7500
+ListenStream={port}
 """.strip(),
         makedirs=True,
         require=[m],
@@ -29,10 +30,18 @@ ListenStream=7500
 else:
     preqs = []
 
+selinux = Selinux.port_policy_present(
+    f"Tang on port {port}",
+    sel_type="tangd_port_t",
+    protocol="tcp",
+    port=port,
+    require=preqs,
+).requisite
+
 if rw_only_or_physical():
     q = Qubes.bind_dirs(
         "90-tang",
         directories=["/var/db/tang"],
         require=preqs,
-        require_in=[reloadsystemd],
+        require_in=[reloadsystemd, selinux],
     ).requisite
