@@ -286,9 +286,12 @@ require {
 	type httpd_t;
 	type initrc_t;
 	class key read;
+	type unconfined_service_t;
+	class sem { unix_read unix_write };
 }
 
 allow httpd_t initrc_t:key read;
+allow httpd_t unconfined_service_t:sem { unix_read unix_write };
 """.strip(),
         require=[before_selinux],
         require_in=[after_selinux],
