@@ -1,14 +1,22 @@
 [Interface]
-Address = {{ peers[grains.id].subnet.split(",")[0] }}
-PrivateKey = {{ privkey }}
-SaveConfig = false
+# {{ network_name }} configuration file for {{ me }} 
+Address = {{ peers[me].subnet.split(",")[0] }}
+{%- if dns | default(None) %}
+DNS = {{ dns }}
+{%- endif %}
+PrivateKey = {{ peers[me].privkey }}
+{%- if saveconfig | default(True) %}
+SaveConfig = false{% endif %}
 ListenPort = {{ port }}
 # Ping the known peers to hasten awakening of connectivity.
-PostUp = {%   for c in peers.values() %}ping -c1 {{ c.subnet.split("/")[0] }} || true & {% endfor %} wait
+{%- if saveconfig | default(True) %}
+PostUp = {%   for n, c in peers.items() %}{% if n != me %}ping -c1 {{ c.subnet.split("/")[0].split(",")[0] }} || true & {% endif %}{% endfor %}wait
+{%- endif %}
 {%- for name, c in peers.items() %}
-{%-   if name == grains.id %}{% else %}
+{%-   if name == me %}{% else %}
+
 [Peer]
-# {{ name }}
+# {{ name }} for {{ me }}
 PublicKey = {{ c.pubkey }}
 AllowedIPs = {{ c.subnet }}
 {%-     if c.address|default(None) %}

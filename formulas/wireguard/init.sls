@@ -86,6 +86,8 @@ if rw_only_or_physical():
         require=persreqs,
     ):
         for network, netdata in context["networks"].items():
+            if network not in context["enabled"]: continue
+            netdata["me"] = grains('id')
             File.managed(
                 f"/etc/wireguard/{network}.conf",
                 source="salt://wireguard/network.conf.j2",
@@ -102,13 +104,14 @@ with Qubes.enable_dom0_managed_service(
 ):
 
     for network in context["networks"]:
+        if network not in context["enabled"]: continue
         if fully_persistent:
             Service.enabled(
                 f"wg-quick@{network}",
                 require=persreqs,
             )
     
-        if rw_only_or_physical():
+        if rw_only_or_physical() and pillar("restart_services", True):
             Service.running(
                 f"wg-quick@{network} running",
                 name=f"wg-quick@{network}",
