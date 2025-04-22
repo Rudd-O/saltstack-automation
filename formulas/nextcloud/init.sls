@@ -1,6 +1,7 @@
 include:
 - .database
 - .program
+- .files_actions
 
 {% if salt['grains.get']("qubes:persistence") in ["rw-only", ""] %}
 
