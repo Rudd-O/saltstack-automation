@@ -264,7 +264,7 @@ if __name__ == "__main__":
 
 
     print(tree())
-    print(get('Machines/openwrt/ubus/assistant'))
+    print(get('Machines/ap/ubus/assistant'))
     sys.exit(0)
 
     executor = concurrent.futures.ThreadPoolExecutor(25)
