@@ -3,6 +3,7 @@
 include:
 - .marker
 - .debugoff
+- .cdi
 - .selinuxenforcing
 - .units
 
@@ -12,6 +13,7 @@ Cleanup begun:
     - service: Disable debug shell
     - cmd: setenforce 1
     - test: Before enabling units
+    - test: Before NVIDIA CDI
 
 extend:
   Remove distupgrade marker:
@@ -20,6 +22,7 @@ extend:
       - service: Disable debug shell
       - file: Set SELinux to enforcing
       - test: After enabling units
+      - test: After NVIDIA CDI
 
 Cleanup complete:
   test.nop:
