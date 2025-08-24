@@ -27,6 +27,9 @@ subuid = Podman.allocate_subuid_range(
 ).requisite
 """
 domain = pillar("collabora:domain")
+version = pillar("collabora:version", "")
+if version:
+    version = f":{version}"
 
 p = Pkg.installed(
     "podman",
@@ -34,7 +37,7 @@ p = Pkg.installed(
 
 Podman.present(
     "collabora-code",
-    image=f"registry.hub.docker.com/collabora/code",
+    image=f"registry.hub.docker.com/collabora/code{version}",
     options=[
         {"e":
             "extra_params=--o:ssl.enable=false"
