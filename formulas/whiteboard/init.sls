@@ -32,9 +32,13 @@ p = Pkg.installed(
     "podman",
 ).requisite
 
+version = pillar("whiteboard:version", "release")
+if version:
+    version = f":{version}"
+
 Podman.present(
     "whiteboard",
-    image=f"ghcr.io/nextcloud-releases/whiteboard:release",
+    image=f"ghcr.io/nextcloud-releases/whiteboard{version}",
     # Listen port is 3002
     options=[
         {"e": f"NEXTCLOUD_URL=https://{domain}"},
