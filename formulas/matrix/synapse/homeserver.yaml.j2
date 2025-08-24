@@ -197,7 +197,9 @@ presence: {{ ( presence | default({}) ) | json }}
 # For example, for room version 1, default_room_version should be set
 # to "1".
 #
-default_room_version: {{ ( (default_room_version | default("6")) | string ) | json }}
+{%- if default_room_version is defined %}
+default_room_version: {{ default_room_version | json }}
+{%- endif %}
 
 # The GC threshold parameters to pass to `gc.set_threshold`, if defined
 #
@@ -405,6 +407,10 @@ listeners: {{
   #- port: 9000
   #  bind_addresses: ['::1', '127.0.0.1']
   #  type: manhole
+
+experimental_features:
+  msc3266_enabled: true
+
 
 # Connection settings for the manhole
 #
