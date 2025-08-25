@@ -36,21 +36,38 @@ version = pillar("whiteboard:version", "release")
 if version:
     version = f":{version}"
 
-Podman.present(
+q = Podman.quadlet_present(
     "whiteboard",
     image=f"ghcr.io/nextcloud-releases/whiteboard{version}",
     # Listen port is 3002
-    options=[
-        {"e": f"NEXTCLOUD_URL=https://{domain}"},
-        {"e": f"JWT_SECRET_KEY={jwt}"},
-        {"network": "host"},
-        # {"cap-add": "MKNOD"},
-        #{"subuidname": username},
-        #{"subgidname": username},
-        {"userns": "keep-id"},
-        #{"security-opt": "unmask=/proc/*"},
+    environment=[
+        f"NEXTCLOUD_URL=https://{domain}",
+        f"JWT_SECRET_KEY={jwt}",
     ],
+    network="host",
+    userns="keep-id",
+    args=["--logs-dir=/tmp", "--verbose"],
     enable=True,
     runas=username,
+    makedirs=True,
     require=[p] + [subuid, subgid],
+).requisite
+
+rld = Userservice.systemd_reload(
+    f"daemon-reload for {sls}",
+    user=username,
+    onchanges=[q],
+).requisite
+
+lng = Userservice.linger(
+    f"Linger {username}",
+    user=username,
+).requisite
+
+rn = Userservice.running(
+    "whiteboard",
+    user=username,
+    enable=True,
+    require=[rld, lng],
+    watch=[q],
 )
