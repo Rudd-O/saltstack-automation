@@ -112,3 +112,15 @@ def dead(name, user):
         "changes": {**startret["changes"]},
     }
     return ret
+
+def linger(name, user):
+    ret = {"name": name, "result": False, "changes": {}, "comment": ""}
+    result = __salt__["cmd.run"](f"loginctl user-status {shlex.quote(user)}", raise_err=True)
+    if "Linger: yes" in result:
+        ret["result"] = True
+        ret["comment"] = "{0} is already lingering".format(user)
+        return ret
+
+    ret = list(__salt__["state.single"]("cmd.run", f"loginctl enable-linger {shlex.quote(user)}").values())[0]
+    ret["name"] = name
+    return ret
