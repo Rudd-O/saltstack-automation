@@ -204,6 +204,73 @@ def present(name, image, options=None, dryrun=False, enable=None, runas=None, ar
         changes=dict((r["name"], r["changes"]) for r in rets if r["changes"]),
     )
 
+
+def quadlet_present(
+    name,
+    image,
+    environment=None,
+    network=None,
+    enable=None,
+    runas=None,
+    userns=None,
+    args=None,
+    **kwargs
+):
+    """
+    Creates a container with a name, and deploys it as a podman quadlet.
+
+    If dryrun is specified, the existing properties of the
+    container are checked, and changes are returned accordingly
+    without making any changes.
+
+    `runas` specifies under what host system user to run the
+    container as.
+    """
+    if runas is None:
+        uid = 0
+    else:
+        uid = __salt__["cmd.run"](f"id {quote(runas)}").split("=")[1].split("(")[0]
+    escaped_name = _escape_unit(name)[:-8]
+    unit_path = (
+        "/etc/containers/systemd/system/%s.container" % escaped_name
+    ) if runas is None else (
+        "/etc/containers/systemd/users/%s/%s.container" % (uid, escaped_name)
+    )
+
+    rets = []
+    a, success = rets.append, lambda: not rets or all(
+        r["result"] != False for r in rets
+    )
+
+    environment = "\n".join([f"Environment={e}" for e in environment]) if environment else ""
+    network = f"Network={network}" if network else ""
+    userns = f"UserNS={userns}" if userns else ""
+    args = f"Exec={(" ".join(quote(q) for q in args))}" if args else ""
+
+    return _single(
+        "quadlet creation",
+        "file.managed",
+        name=unit_path,
+        contents=f"""\
+[Unit]
+Description=Podman container for {name}
+Documentation=man:podman-systemd(1)
+
+[Container]
+Image={image}
+{environment}
+{network}
+{userns}
+{args}
+
+[Install]
+WantedBy=default.target
+""",
+        **kwargs,
+    )
+
+
+
 from salt.states.service import _get_systemd_only
 from salt.exceptions import CommandExecutionError
 
