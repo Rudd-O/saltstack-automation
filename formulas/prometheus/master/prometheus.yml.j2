@@ -40,6 +40,57 @@ alerting:
 
 scrape_configs:
 
+  - job_name: relabel_config_holder for service discovery
+    relabel_configs: &http_sd_relabel_configs
+    -
+      source_labels: [job]
+      regex: (.+) at (.+) via sd on port (.+)
+      target_label: location
+      replacement: ${2}
+    -
+      source_labels: [job]
+      regex: (.+) at (.+) via sd on port (.+)
+      target_label: __param_port
+      replacement: ${3}
+    -
+      source_labels: [job]
+      regex: (.+) at (.+) via sd on port (.+)
+      target_label: job
+      replacement: ${1}
+    -
+      source_labels: [__address__]
+      regex: (.+)
+      target_label: __param_target
+      replacement: ${1}
+    -
+      source_labels: [__address__]
+      regex: (.+)
+      target_label: instance
+      replacement: ${1}
+{%- for ip, host, domain in proxy_to_domain_map %}
+    -
+      source_labels: [__meta_url, instance]
+      separator: ;
+      regex: http(s|)://{{ ip }}:[0-9]+/discover;{{ host.split(".")[0] }}
+      action: drop
+    -
+      source_labels: [__meta_url, instance]
+      separator: ;
+      regex: http(s|)://{{ ip }}:[0-9]+/discover;(.+)
+      target_label: instance
+      replacement: ${2}{{ domain }}
+{%- endfor %}
+    -
+      source_labels: [__meta_url]
+      regex: http(s|)://([^/]+)/discover
+      target_label: __address__
+      replacement: ${2}
+    -
+      source_labels: [__meta_url]
+      regex: (.+)
+      target_label: __metrics_path__
+      replacement: /forward
+
   - job_name: relabel_config_holder
     relabel_configs: &relabel_configs
     - 
@@ -195,6 +246,10 @@ scrape_configs:
     {{ record }}: {{ data[record] | json }}
 {%-    endif %}
 {%-  endfor %}
+{%-  if "http_sd_configs" in data %}
+    http_sd_configs: {{ data.http_sd_configs | json }}
+    relabel_configs: *http_sd_relabel_configs
+{%-  else %}
     static_configs:
     - targets:
 {%-  for target in data.targets %}
@@ -209,6 +264,7 @@ scrape_configs:
         %}
 {%-  endfor %}
     relabel_configs: *relabel_configs
+{%-  endif %}
 
 {%- if data.metric_relabel_configs | default(None) %}
     metric_relabel_configs: {{ data.metric_relabel_configs | json }}
