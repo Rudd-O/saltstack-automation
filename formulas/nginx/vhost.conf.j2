@@ -6,6 +6,10 @@
         ssl_certificate "{{ ssl_certificate }}";
         ssl_certificate_key "{{ ssl_certificate_key }}";
 
+{%-     if root|default(None) %}
+        root {{ root }};
+{%-     endif %}
+
 {%-     if hsts|default(True) %}
         add_header Strict-Transport-Security "max-age=63072000; preload" always;
 {%-     endif %}
