@@ -392,7 +392,7 @@ def qvm_service(name, vms, action, services=None):
         try:
             output = subprocess.check_output(["qvm-service", "--", vm], stderr=subprocess.STDOUT, text=True)
         except Exception as e:
-            ret["comment"] = f"qvm-service failed ({e}):\n{output.strip()}"
+            ret["comment"] = f"qvm-service failed ({e}):\n{e.output.strip()}"
 
         current_service_state_for_vm = [
             line.split() for line
