@@ -129,7 +129,35 @@ else:
         logfile.write("%.2f Bombshell adapter %s: connection type for host %s is %s\n" % (
             time.time(), myself, host, roster.get(host, {}).get("connection_type")
         ))
-    if roster.get(host, {}).get("connection_type") == "qubes":
+    if roster.get(host, {}).get("connection_type") == "local":
+        if myself == "scp":
+            local_file = cmd[0]
+            remote_file = cmd[1]
+            cmd = ["sh", "-c", "cat > %s" % shlex.quote(remote_file)]
+        else:
+            cmd = ["sh", "-c", cmd[0]]
+        if user is not None:
+            cmd = ["sudo", "-u", user] + cmd
+        if myself == "scp":
+            if logfile:
+                logfile.write("%.2f local adapter %s: copying %s to %s with command %s\n" % (time.time(), myself, local_file, remote_file, cmd))
+                logfile.flush()
+            lfd = open(local_file, "rb")
+            p = subprocess.Popen(cmd, env=childenv, stdin=lfd, close_fds=True, universal_newlines=False)
+            lfd.close()
+            ret = p.wait()
+            if logfile:
+                logfile.write("%.2f local adapter %s: copy finished with return code %s\n" % (time.time(), myself, ret))
+                logfile.flush()
+                logfile.close()
+            sys.exit(ret)
+        else:
+            proxied_cmd = cmd
+            args = (proxied_cmd[0], proxied_cmd, childenv)
+            if logfile:
+                logfile.write("%.2f local adapter %s: will run command %s\n" % (time.time(), myself, args[1]))
+                logfile.flush()
+    elif roster.get(host, {}).get("connection_type") == "qubes":
         if myself == "scp":
             local_file = cmd[0]
             remote_file = cmd[1]
@@ -153,6 +181,9 @@ else:
         else:
             proxied_cmd = proxyize(roster, host, cmd, opts, vmname=roster[host].get("vm_name", host))
             args = (proxied_cmd[0], proxied_cmd, childenv)
+            if logfile:
+                logfile.write("%.2f Bombshell adapter %s: will run command %s\n" % (time.time(), myself, args[1]))
+                logfile.flush()
     else:
         args = (myself, [myself] + sys.argv[1:], childenv)
 
