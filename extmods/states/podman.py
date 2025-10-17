@@ -209,6 +209,9 @@ def quadlet_present(
     name,
     image,
     environment=None,
+    port_forwards=None,
+    volumes=None,
+    unit_stanzas=None,
     network=None,
     enable=None,
     runas=None,
@@ -243,29 +246,37 @@ def quadlet_present(
     )
 
     environment = "\n".join([f"Environment={e}" for e in environment]) if environment else ""
+    port_forwards = "\n".join([f"PublishPort={e}" for e in port_forwards]) if port_forwards else ""
+    volumes = "\n".join([f"Volume={e}" for e in volumes]) if volumes else ""
+    unit_stanzas = "\n".join([f"{e}" for e in unit_stanzas]) if unit_stanzas else ""
     network = f"Network={network}" if network else ""
     userns = f"UserNS={userns}" if userns else ""
     args = f"Exec={(" ".join(quote(q) for q in args))}" if args else ""
 
-    return _single(
-        "quadlet creation",
-        "file.managed",
-        name=unit_path,
-        contents=f"""\
+    contents = f"""\
 [Unit]
 Description=Podman container for {name}
 Documentation=man:podman-systemd(1)
+{unit_stanzas}
 
 [Container]
 Image={image}
 {environment}
+{port_forwards}
+{volumes}
 {network}
 {userns}
 {args}
 
 [Install]
 WantedBy=default.target
-""",
+"""
+
+    return _single(
+        "quadlet creation",
+        "file.managed",
+        name=unit_path,
+        contents=contents,
         **kwargs,
     )
 
