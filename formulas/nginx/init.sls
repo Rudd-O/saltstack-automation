@@ -4,29 +4,25 @@
 from salt://lib/qubes.sls import template, fully_persistent_or_physical
 
 
-if fully_persistent_or_physical():
-    with Pkg.installed("nginx"):
-        dropin = File.managed(
-            "/etc/systemd/system/nginx.service.d/ulimits.conf",
-            contents="""[Service]
+with Pkg.installed("nginx"):
+    dropin = File.managed(
+        "/etc/systemd/system/nginx.service.d/ulimits.conf",
+        contents="""[Service]
 LimitNOFILE=1048576
 """,
-            makedirs=True,
-        ).requisite
-    daemonreload = Cmd.run(
-        "Reload NginX service file",
-        name="systemctl --system daemon-reload",
-        onchanges=[dropin],
+        makedirs=True,
     ).requisite
-    svc = Qubes.enable_dom0_managed_service(
-        "nginx",
-        require=[daemonreload],
-    ).requisite
-    deps = [svc]
-    dropin = [dropin]
-else:
-    deps = []
-    dropin = []
+daemonreload = Cmd.run(
+    "Reload NginX service file",
+    name="systemctl --system daemon-reload",
+    onchanges=[dropin],
+).requisite
+svc = Qubes.enable_dom0_managed_service(
+    "nginx",
+    require=[daemonreload],
+).requisite
+deps = [svc]
+dropin = [dropin]
 
 if not template():
     certbot_webroot = "/etc/letsencrypt/webroot"
