@@ -78,6 +78,20 @@ def bind_dirs(name, directories):
             },
         )
 
+    directories = [
+        d for d in directories
+        if not d.startswith("/rw/")
+        and not d.startswith("/home/")
+    ]
+    if not directories:
+        return _mimic(
+            ret,
+            {
+                "result": True,
+                "comment": "Nothing to do (none of the specified directories are outside /rw or /home).",
+            },
+        )
+
     try:
         assert os.path.basename(name) == name, (
             "The configuration name %r is not a base file name." % name
