@@ -589,10 +589,10 @@ php_admin_value[max_execution_time] = 150
     # FIXME: still missing here: face:sync-albums
     face_install = occ("app:install facerecognition")
     face_memory = occ("face:setup -M 1G")
-    face_model = occ("face:setup -m 3")
+    face_model = occ("face:setup -m 1")
     face_config = "; ".join(occ(xxx) for xxx in [
         'config:app:set facerecognition handle_external_files --value=true',
-        'config:app:set facerecognition clustering_batch_size --value=4000',
+        'config:app:set facerecognition clustering_batch_size --value=5000',
     ])
     setupface = Cmd.run(
         "Setup facerecognition",
