@@ -217,6 +217,7 @@ def quadlet_present(
     runas=None,
     userns=None,
     args=None,
+    environment_file=None,
     **kwargs
 ):
     """
@@ -246,6 +247,7 @@ def quadlet_present(
     )
 
     environment = "\n".join([f"Environment={e}" for e in environment]) if environment else ""
+    environment_file = f"EnvironmentFile={environment_file}\n" if environment_file else ""
     port_forwards = "\n".join([f"PublishPort={e}" for e in port_forwards]) if port_forwards else ""
     volumes = "\n".join([f"Volume={e}" for e in volumes]) if volumes else ""
     unit_stanzas = "\n".join([f"{e}" for e in unit_stanzas]) if unit_stanzas else ""
@@ -261,7 +263,7 @@ Documentation=man:podman-systemd(1)
 
 [Container]
 Image={image}
-{environment}
+{environment_file}{environment}
 {port_forwards}
 {volumes}
 {network}

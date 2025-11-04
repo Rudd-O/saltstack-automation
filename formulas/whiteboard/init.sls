@@ -1,8 +1,8 @@
 #!objects
 
+from salt://lib/qubes.sls import template
+from salt://lib/defs.sls import SystemUser
 
-from salt://lib/qubes.sls import template, fully_persistent_or_physical
-from salt://lib/defs.sls import Perms, SystemUser
 
 username = "whiteboard"
 
@@ -25,9 +25,6 @@ subuid = Podman.allocate_subuid_range(
     require=[u],
 ).requisite
 
-domain = pillar("whiteboard:domain")
-jwt = pillar("whiteboard:jwt_secret_key")
-
 p = Pkg.installed(
     "podman",
 ).requisite
@@ -40,10 +37,7 @@ q = Podman.quadlet_present(
     "whiteboard",
     image=f"ghcr.io/nextcloud-releases/whiteboard{version}",
     # Listen port is 3002
-    environment=[
-        f"NEXTCLOUD_URL=https://{domain}",
-        f"JWT_SECRET_KEY={jwt}",
-    ],
+    environment_file="/etc/default/whiteboard",
     network="host",
     userns="keep-id",
     args=["--logs-dir=/tmp", "--verbose"],
@@ -53,10 +47,18 @@ q = Podman.quadlet_present(
     require=[p] + [subuid, subgid],
 ).requisite
 
+qubified = Qubes.enable_dom0_managed_service(
+    "whiteboard qubified",
+    name="whiteboard",
+    require=[q],
+    scope="user",
+    enable=False,
+).requisite
+
 rld = Userservice.systemd_reload(
     f"daemon-reload for {sls}",
     user=username,
-    onchanges=[q],
+    onchanges=[q, qubified],
 ).requisite
 
 lng = Userservice.linger(
@@ -64,10 +66,27 @@ lng = Userservice.linger(
     user=username,
 ).requisite
 
-rn = Userservice.running(
-    "whiteboard",
-    user=username,
-    enable=True,
-    require=[rld, lng],
-    watch=[q],
-)
+if not template():
+    domain = pillar("whiteboard:domain")
+    jwt = pillar("whiteboard:jwt_secret_key")
+    env = File.managed(
+        "/etc/default/whiteboard",
+        contents=f"""NEXTCLOUD_URL=https://{domain}
+JWT_SECRET_KEY={jwt}""",
+        onchanges_in=[rld],
+        user="root",
+        group="whiteboard",
+        mode="0640",
+    ).requisite
+    envbind = Qubes.bind_dirs(
+        'whiteboard',
+        directories=['/etc/default/whiteboard'],
+        require=env,
+    ).requisite
+    rn = Userservice.running(
+        "whiteboard",
+        user=username,
+        enable=True,
+        require=[rld, lng],
+        watch=[q, env, envbind],
+    )

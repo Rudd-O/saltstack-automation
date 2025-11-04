@@ -248,7 +248,7 @@ def enable_dom0_managed_service(
     """
     if qubes_service_name is None:
         qubes_service_name = name
-    if scope != "system":
+    if scope not in ["system", "user"]:
         raise NotImplementedError("The scope %r is not implemented yet" % scope)
 
     ret = dict(name=name, result=False, changes={}, comment="")
