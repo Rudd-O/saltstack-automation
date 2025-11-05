@@ -11,6 +11,12 @@ u = SystemUser(
     shell="/sbin/nologin",
 )
 
+contexts_needed = Cmd.run(
+    "Verify container contexts need to be applied",
+    name="semanage fcontext -l | grep -q ^/var/lib.*local/share/containers/storage && echo changed=no || echo changed=yes",
+    stateful=True,
+).requisite
+
 contexts_present = []
 for n, (path_re, setype) in enumerate([
     ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/artifacts(/.*)?', 'container_ro_file_t'),
@@ -29,6 +35,7 @@ for n, (path_re, setype) in enumerate([
             filetype="a",
             sel_user="system_u",
             sel_type=setype,
+            onchanges=[contexts_needed],
         ).requisite
     )
 
@@ -51,7 +58,7 @@ context_applied = Selinux.fcontext_policy_applied(
     f"Apply SELinux contexts for containers of {username}",
     name=f"/var/lib/{username}/.local/share/containers",
     recursive=True,
-    onchanges=contexts_present + [localsharecontainers, containerbind],
+    onchanges=contexts_present + [contexts_needed] + [localsharecontainers, containerbind],
 ).requisite
 
 subgid = Podman.allocate_subgid_range(
