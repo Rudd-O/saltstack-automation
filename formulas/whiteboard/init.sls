@@ -11,6 +11,36 @@ u = SystemUser(
     shell="/sbin/nologin",
 )
 
+localsharecontainers = File.directory(
+    f"/var/lib/{username}/.local/share/containers",
+    user=username,
+    group=username,
+    mode="0700",
+    makedirs=True,
+    require=[u],
+).requisite
+
+containerbind = Qubes.bind_dirs(
+    f'{username}-containers',
+    directories=[f'/var/lib/{username}/.local/share/containers'],
+    require=[localsharecontainers],
+).requisite
+
+context_present = Selinux.fcontext_policy_present(
+    f"Set up SELinux contexts for containers of {username}",
+    name=f"(/rw/bind-dirs|)/var/lib/{username}/.local/share/containers(/.*)?",
+    filetype="a",
+    sel_user="system_u",
+    sel_type="container_file_t",
+    require=[containerbind],
+).requisite
+context_applied = Selinux.fcontext_policy_applied(
+    f"Apply SELinux contexts for containers of {username}",
+    name=f"/var/lib/{username}/.local/share/containers",
+    recursive=True,
+    onchanges=[context_present],
+).requisite
+
 subgid = Podman.allocate_subgid_range(
     f"{username} subgid",
     name=username,
@@ -44,7 +74,7 @@ q = Podman.quadlet_present(
     enable=True,
     runas=username,
     makedirs=True,
-    require=[p] + [subuid, subgid],
+    require=[p] + [subuid, subgid] + [containerbind, context_applied],
 ).requisite
 
 qubified = Qubes.enable_dom0_managed_service(
@@ -61,11 +91,6 @@ rld = Userservice.systemd_reload(
     onchanges=[q, qubified],
 ).requisite
 
-lng = Userservice.linger(
-    f"Linger {username}",
-    user=username,
-).requisite
-
 if not template():
     domain = pillar("whiteboard:domain")
     jwt = pillar("whiteboard:jwt_secret_key")
@@ -78,10 +103,14 @@ JWT_SECRET_KEY={jwt}""",
         group="whiteboard",
         mode="0640",
     ).requisite
+    lng = Userservice.linger(
+        f"Linger {username}",
+        user=username,
+    ).requisite
     envbind = Qubes.bind_dirs(
         'whiteboard',
-        directories=['/etc/default/whiteboard'],
-        require=env,
+        directories=['/etc/default/whiteboard', f'/var/lib/systemd/linger/{username}'],
+        require=[env, lng],
     ).requisite
     rn = Userservice.running(
         "whiteboard",
