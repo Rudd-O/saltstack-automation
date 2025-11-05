@@ -11,13 +11,34 @@ u = SystemUser(
     shell="/sbin/nologin",
 )
 
+contexts_present = []
+for n, (path_re, setype) in enumerate([
+    ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/artifacts(/.*)?', 'container_ro_file_t'),
+    ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay(/.*)?', 'container_ro_file_t') ,
+    ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay-images(/.*)?', 'container_ro_file_t'),
+    ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay-layers(/.*)?', 'container_ro_file_t'),
+    ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay2(/.*)?', 'container_ro_file_t'),
+    ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay2-images(/.*)?', 'container_ro_file_t'),
+    ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay2-layers(/.*)?', 'container_ro_file_t'),
+    ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/volumes/[^/]*/.*', 'container_file_t'),
+]):
+    contexts_present.append(
+        Selinux.fcontext_policy_present(
+            f"Set up SELinux contexts for containers of {username} at {n}",
+            name=path_re,
+            filetype="a",
+            sel_user="system_u",
+            sel_type=setype,
+        ).requisite
+    )
+
 localsharecontainers = File.directory(
     f"/var/lib/{username}/.local/share/containers",
     user=username,
     group=username,
     mode="0700",
     makedirs=True,
-    require=[u],
+    require=[u] + contexts_present,
 ).requisite
 
 containerbind = Qubes.bind_dirs(
@@ -26,19 +47,11 @@ containerbind = Qubes.bind_dirs(
     require=[localsharecontainers],
 ).requisite
 
-context_present = Selinux.fcontext_policy_present(
-    f"Set up SELinux contexts for containers of {username}",
-    name=f"(/rw/bind-dirs|)/var/lib/{username}/.local/share/containers(/.*)?",
-    filetype="a",
-    sel_user="system_u",
-    sel_type="container_file_t",
-    require=[containerbind],
-).requisite
 context_applied = Selinux.fcontext_policy_applied(
     f"Apply SELinux contexts for containers of {username}",
     name=f"/var/lib/{username}/.local/share/containers",
     recursive=True,
-    onchanges=[context_present],
+    onchanges=contexts_present + [localsharecontainers, containerbind],
 ).requisite
 
 subgid = Podman.allocate_subgid_range(
