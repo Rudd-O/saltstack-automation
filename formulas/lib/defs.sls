@@ -130,6 +130,76 @@ def SystemUser(id_, shell=None, **kwargs):
     return u
 
 
+def SystemUserForContainers(id_, shell=None, **kwargs):
+    u = SystemUser(id_, shell=shell, **kwargs)
+
+    contexts_needed = Cmd.run(
+        f"Verify container contexts need to be created for {id_}",
+        name="semanage fcontext -l | grep -q ^/var/lib.*local/share/containers/storage && echo changed=no || echo changed=yes",
+        stateful=True,
+    ).requisite
+
+    contexts_present = []
+    for n, (path_re, setype) in enumerate([
+        ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/artifacts(/.*)?', 'container_ro_file_t'),
+        ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay(/.*)?', 'container_ro_file_t') ,
+        ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay-images(/.*)?', 'container_ro_file_t'),
+        ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay-layers(/.*)?', 'container_ro_file_t'),
+        ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay2(/.*)?', 'container_ro_file_t'),
+        ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay2-images(/.*)?', 'container_ro_file_t'),
+        ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay2-layers(/.*)?', 'container_ro_file_t'),
+        ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/volumes/[^/]*/.*', 'container_file_t'),
+    ]):
+        contexts_present.append(
+            Selinux.fcontext_policy_present(
+                f"Set up SELinux contexts for containers of {id_} at {n}",
+                name=path_re,
+                filetype="a",
+                sel_user="system_u",
+                sel_type=setype,
+                onchanges=[contexts_needed],
+            ).requisite
+        )
+
+    localsharecontainers = File.directory(
+        f"/var/lib/{id_}/.local/share/containers",
+        user=id_,
+        group=id_,
+        mode="0700",
+        makedirs=True,
+        require=[u] + contexts_present,
+    ).requisite
+
+    containerbind = Qubes.bind_dirs(
+        f'{id_}-containers',
+        directories=[f'/var/lib/{id_}/.local/share/containers'],
+        require=[localsharecontainers],
+    ).requisite
+
+    context_applied = Selinux.fcontext_policy_applied(
+        f"Apply SELinux contexts for containers of {id_}",
+        name=f"/var/lib/{id_}/.local/share/containers",
+        recursive=True,
+        onchanges=contexts_present + [contexts_needed] + [localsharecontainers, containerbind],
+    ).requisite
+
+    subgid = Podman.allocate_subgid_range(
+        f"{id_} subgid",
+        name=id_,
+        howmany="1000000",
+        require=[u],
+    ).requisite
+
+    subuid = Podman.allocate_subuid_range(
+        f"{id_} subuid",
+        name=id_,
+        howmany="1000000",
+        require=[u],
+    ).requisite
+
+    return [u, localsharecontainers, containerbind, context_applied, subgid, subuid]
+
+
 # Deprecate me with the state SshKeypair.present.
 def SSHKeyForUser(id_, key, key_name="id_rsa", key_path=".ssh", **kwargs):
     if key_path.startswith(os.path.pathsep):

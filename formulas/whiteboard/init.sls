@@ -1,79 +1,15 @@
 #!objects
 
 from salt://lib/qubes.sls import template
-from salt://lib/defs.sls import SystemUser
+from salt://lib/defs.sls import SystemUserForContainers
 
 
 username = "whiteboard"
 
-u = SystemUser(
+u, localsharecontainers, containerbind, context_applied, subgid, subuid = SystemUserForContainers(
     username,
     shell="/sbin/nologin",
 )
-
-contexts_needed = Cmd.run(
-    "Verify container contexts need to be applied",
-    name="semanage fcontext -l | grep -q ^/var/lib.*local/share/containers/storage && echo changed=no || echo changed=yes",
-    stateful=True,
-).requisite
-
-contexts_present = []
-for n, (path_re, setype) in enumerate([
-    ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/artifacts(/.*)?', 'container_ro_file_t'),
-    ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay(/.*)?', 'container_ro_file_t') ,
-    ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay-images(/.*)?', 'container_ro_file_t'),
-    ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay-layers(/.*)?', 'container_ro_file_t'),
-    ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay2(/.*)?', 'container_ro_file_t'),
-    ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay2-images(/.*)?', 'container_ro_file_t'),
-    ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay2-layers(/.*)?', 'container_ro_file_t'),
-    ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/volumes/[^/]*/.*', 'container_file_t'),
-]):
-    contexts_present.append(
-        Selinux.fcontext_policy_present(
-            f"Set up SELinux contexts for containers of {username} at {n}",
-            name=path_re,
-            filetype="a",
-            sel_user="system_u",
-            sel_type=setype,
-            onchanges=[contexts_needed],
-        ).requisite
-    )
-
-localsharecontainers = File.directory(
-    f"/var/lib/{username}/.local/share/containers",
-    user=username,
-    group=username,
-    mode="0700",
-    makedirs=True,
-    require=[u] + contexts_present,
-).requisite
-
-containerbind = Qubes.bind_dirs(
-    f'{username}-containers',
-    directories=[f'/var/lib/{username}/.local/share/containers'],
-    require=[localsharecontainers],
-).requisite
-
-context_applied = Selinux.fcontext_policy_applied(
-    f"Apply SELinux contexts for containers of {username}",
-    name=f"/var/lib/{username}/.local/share/containers",
-    recursive=True,
-    onchanges=contexts_present + [contexts_needed] + [localsharecontainers, containerbind],
-).requisite
-
-subgid = Podman.allocate_subgid_range(
-    f"{username} subgid",
-    name=username,
-    howmany="1000000",
-    require=[u],
-).requisite
-
-subuid = Podman.allocate_subuid_range(
-    f"{username} subuid",
-    name=username,
-    howmany="1000000",
-    require=[u],
-).requisite
 
 p = Pkg.installed(
     "podman",
