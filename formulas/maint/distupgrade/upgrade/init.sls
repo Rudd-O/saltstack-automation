@@ -31,7 +31,7 @@ refresh = Cmd.script(
     require=[upg],
 ).requisite
 
-if grains("os") == "Fedora":
+if grains("os") == "Fedora" and 0:
     include("needs-restart")
     Maint.services_restarted(
         "Restart services",

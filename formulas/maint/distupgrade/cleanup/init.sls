@@ -2,6 +2,7 @@
 
 include:
 - .marker
+- .patch-grub
 - .debugoff
 - .cdi
 - .selinuxenforcing
@@ -12,6 +13,7 @@ Cleanup begun:
   - require_in:
     - service: Disable debug shell
     - cmd: setenforce 1
+    - cmd: Patch GRUB
     - test: Before enabling units
     - test: Before NVIDIA CDI
 
@@ -21,6 +23,7 @@ extend:
     - require:
       - service: Disable debug shell
       - file: Set SELinux to enforcing
+      - cmd: Regenerate GRUB
       - test: After enabling units
       - test: After NVIDIA CDI
 
