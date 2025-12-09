@@ -41,6 +41,7 @@ http {
     sendfile            {% if salt.pillar.get("nginx:http:sendfile", True) %}on{% else %}off{% endif %};
     tcp_nopush          on;
     keepalive_timeout   65;
+    proxy_read_timeout  80;
     types_hash_max_size 4096;
 
     include             /etc/nginx/mime.types;
