@@ -8,7 +8,7 @@ from salt://lib/copr.sls import copr
 
 TMPDIR = "/var/tmp/nextcloud"
 MEM = "4G"
-memories_index_arguments = "-g Parents"
+memories_index_arguments = "-g Parents --skip-cleanup"
 preview_generator_arguments = "Rudd-O Lidia"
 
 def occ(cmd):
