@@ -10,13 +10,13 @@ if fully_persistent_or_physical() or dom0():
     if grains("os") in ["Fedora", "Qubes", "Qubes OS"]:
         include("needs-restart")
     Cmd.run(
-        "check ZFS module before",
+        "Check ZFS module before",
         name=tpl % {"stage": "before"},
-        stateful=True,
+        creates="/var/cache/salt/zfs-dkms/before",
     )
     updreq = Mypkg.uptodate(
         "update packages",
-        require=[Cmd("check ZFS module before")],
+        require=[Cmd("Check ZFS module before")],
     ).requisite
 
     freq = flatpak_updated(require=updreq)
@@ -34,21 +34,21 @@ if fully_persistent_or_physical() or dom0():
                 onchanges=[rest],
             )
     Cmd.run(
-        "check ZFS module after",
+        "Check ZFS module after",
         name=tpl % {"stage": "after"},
         stateful=True,
         require=[updreq],
     )
     Cmd.run(
-        "compare ZFS versions",
+        "Compare ZFS versions",
         name="set -x ; cat /var/cache/salt/zfs-dkms/before /var/cache/salt/zfs-dkms/after >&2 ; cmp /var/cache/salt/zfs-dkms/before /var/cache/salt/zfs-dkms/after >&2 || { echo ; echo changed=yes ; }",
         stateful=True,
-        require=[Cmd("check ZFS module after")],
+        require=[Cmd("Check ZFS module after")],
     )
     with Cmd.script(
         "salt://maint/update/refresh-zfs-dkms.sh",
         args="force",
-        onchanges=[Cmd("compare ZFS versions")],
+        onchanges=[Cmd("Compare ZFS versions")],
         stateful=True,
     ):
         Cmd.run("rm -rf /var/cache/salt/zfs-dkms", stateful=True)
