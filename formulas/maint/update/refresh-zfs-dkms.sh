@@ -23,6 +23,18 @@ which dkms >/dev/null 2>&1 || {
 }
 
 changed=no
+
+for a in /var/lib/dkms/zfs/*/source
+do
+    test -d $(dirname "$a") || continue
+    if ! test -d "$a"
+    then
+        echo Removing "$(dirname "$a")" as it no longer points to a valid source >&2
+        $cmd rm -rf "$(dirname "$a")"
+        changed=yes
+    fi
+done
+
 for kver in $(rpm -q kernel --queryformat="%{version}-%{release}.%{arch}\n")
 do
     if [ "$check" == "true" ]
@@ -41,15 +53,26 @@ do
         installed=$(echo "$dks" | grep installed || true)
         if [ "$zfsver" != "" ]
         then
-           if [ -z    "$installed" ] ; then reason="Not installed" ; fi
-           if [ "$force" == "true" ] ; then reason="Force rebuild" ; fi
+            if [ -z    "$installed" ] ; then reason="Not installed" ; fi
+            if ! cmp /var/lib/dkms/zfs/$zfsver/$kver/$(uname -m)/module/zfs.ko.xz /usr/lib/modules/$kver/extra/zfs.ko.xz >&2
+            then
+                reason="Module in DKMS tree does not match module in kernel"
+            fi
+            if [ "$force" == "true" ] ; then reason="Force rebuild" ; fi
         fi
         if [ -n "$reason" ]
         then
             echo "-> $reason -- rebuilding for kernel version $kver ($reason)" >&2
+            if [ "$DEBUG" == "" ] ; then
+                echo 'post_transaction="true"' > /etc/dkms/framework.conf.d/distupgrade.conf
+                trap 'rm -f /etc/dkms/framework.conf.d/distupgrade.conf' EXIT
+            fi
             $cmd dkms uninstall -k "$kver" zfs/"$zfsver" >&2 || echo "no need to uninstall" >&2
             $cmd dkms remove -k "$kver" zfs/"$zfsver" >&2 || echo "no need to remove" >&2
             $cmd dkms install -k "$kver" zfs/"$zfsver" >&2
+            if [ "$DEBUG" == "" ] ; then
+                rm -f /etc/dkms/framework.conf.d/distupgrade.conf
+            fi
             $cmd dracut -f --kver "$kver" >&2
             if test -f /boot/initramfs-"$kver".img ; then
                 if test -f /boot/efi/EFI/*/initramfs-"$kver".img ; then
