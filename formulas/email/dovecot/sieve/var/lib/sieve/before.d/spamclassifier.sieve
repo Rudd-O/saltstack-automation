@@ -12,4 +12,4 @@ if anyof (
 ) {
   fileinto "SPAM";
 }
-{% endif %}
+{% endif -%}{# dovecot 2.4 #}

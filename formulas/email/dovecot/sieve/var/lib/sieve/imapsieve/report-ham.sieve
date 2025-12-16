@@ -9,3 +9,4 @@ if string "${mailbox}" "Trash" {
 }
 
 pipe :copy "learn-ham";
+# dovecot 2.4

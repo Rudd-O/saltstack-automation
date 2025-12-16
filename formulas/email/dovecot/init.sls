@@ -26,13 +26,18 @@ with Pkg.installed(
     require_in=[Pkg("Pigeonhole and bogofilter")] if context["enable"] else [],
 ):
     File.managed(
-        "/etc/dovecot/local.conf",
+        "/etc/dovecot/conf.d/90-local.conf",
         source=f"salt://{slsp}/local.conf.j2",
         mode="0644",
         watch_in=[Service("dovecot")],
         template="jinja",
         context=context,
         require=[Test("dovecot certs ready")] + ([Test("sieve tooling deployed")] if context["enable"] else []),
+    )
+    File.absent(
+        "/etc/dovecot/local.conf",
+        watch_in=[Service("dovecot")],
+        require=[File("/etc/dovecot/conf.d/90-local.conf")],
     )
     Cmd.run(
         "create Diffie-Hellman SSL parameters file",

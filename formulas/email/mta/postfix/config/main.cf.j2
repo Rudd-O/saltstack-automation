@@ -474,7 +474,7 @@ recipient_delimiter = {{ recipient_delimiter }}
 # ALIAS THAT FORWARDS MAIL FOR ROOT TO A REAL USER.
 #
 #mailbox_command = /some/where/procmail
-mailbox_command = {{ mailbox_command }}
+#mailbox_command = {{ mailbox_command }}
 
 # The mailbox_transport specifies the optional transport in master.cf
 # to use after processing aliases and .forward files. This parameter
@@ -493,7 +493,7 @@ mailbox_command = {{ mailbox_command }}
 #
 # Cyrus IMAP over LMTP. Specify ``lmtpunix      cmd="lmtpd"
 # listen="/var/imap/socket/lmtp" prefork=0'' in cyrus.conf.
-#mailbox_transport = lmtp:unix:/var/lib/imap/socket/lmtp
+mailbox_transport = lmtp:unix:private/dovecot-lmtp
 
 # If using the cyrus-imapd IMAP server deliver local mail to the IMAP
 # server using LMTP (Local Mail Transport Protocol), this is prefered
@@ -723,7 +723,6 @@ smtpd_relay_restrictions = permit_sasl_authenticated, permit_mynetworks, reject_
 smtpd_recipient_restrictions = permit_sasl_authenticated, permit_mynetworks, reject_unauth_destination, check_policy_service unix:private/policyd-spf{% if greylisting %}, check_policy_service unix:postgrey/socket{% endif %}
 smtpd_relay_before_recipient_restrictions = yes
 
-smtpd_use_tls = yes
 smtpd_tls_loglevel = 1
 smtpd_tls_received_header = yes
 smtpd_tls_auth_only = yes
@@ -731,10 +730,6 @@ smtpd_tls_cert_file = {{ tls_cert_file }}
 smtpd_tls_key_file = {{ tls_key_file }}
 smtp_tls_security_level = {{ smtp_tls_security_level }}
 smtpd_tls_security_level = {{ smtpd_tls_security_level }}
-smtpd_tls_mandatory_protocols = !SSLv2,!SSLv3,!TLSv1,!TLSv1.1
-smtpd_tls_protocols=!SSLv2,!SSLv3,!TLSv1,!TLSv1.1
-smtpd_tls_mandatory_ciphers = medium
-tls_medium_cipherlist = EECDH+AESGCM:AES256+EECDH:AES128+EECDH
 smtp_tls_note_starttls_offer = yes
 smtp_tls_loglevel = 1
 smtp_tls_cert_file = $smtpd_tls_cert_file
@@ -746,3 +741,5 @@ virtual_alias_maps = hash:/etc/postfix/virtual
 
 smtpd_milters = unix:/var/spool/opendkim/socket/opendkim.sock
 non_smtpd_milters = unix:/var/spool/opendkim/socket/opendkim.sock
+
+internal_mail_filter_classes = bounce

@@ -46,7 +46,7 @@ if context.address.startswith("unix:"):
     tmpfilesd = File.managed(
         "/etc/tmpfiles.d/docker-distribution.conf",
         contents=f"""
-d {dir} 0750 root nginx
+d {dir} 0750 registry nginx
     """.strip(),
         require=[sdir],
     ).requisite

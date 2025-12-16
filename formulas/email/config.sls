@@ -62,6 +62,10 @@ assert config["mta"][n] in o, f"{n} can be only one of {o}"
 
 if "hostname" not in config["mda"]:
     config["mda"]["hostname"] = config["mta"]["hostname"]
+if "domain" not in config["mda"]:
+    config["mda"]["domain"] = config["mta"]["domain"]
+if "recipient_delimiter" not in config["mda"]:
+    config["mda"]["recipient_delimiter"] = config["mta"]["recipient_delimiter"]
 
 if "mailbox_command" not in config["mta"]:
     config["mta"]["mailbox_command"] = "/bin/true"

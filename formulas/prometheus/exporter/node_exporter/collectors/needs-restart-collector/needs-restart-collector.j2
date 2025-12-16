@@ -2,7 +2,7 @@
 
 outfile="$1"
 echo "$outfile" | grep -q "/" || {
-  dir=$(cat /proc/$(pgrep -f ^/usr/bin/node_exporter | head -1)/cmdline | tr '\0' '\n' | grep -- --collector.textfile.directory= | sed 's/^--collector.textfile.directory=//')
+  dir=$(cat /proc/$(pgrep -f ^/usr/bin/.*node.*exporter | head -1)/cmdline | tr '\0' '\n' | grep -- --collector.textfile.directory= | sed 's/^--collector.textfile.directory=//')
   outfile="$dir/$outfile"
   if [ "$dir" == "" ]
   then

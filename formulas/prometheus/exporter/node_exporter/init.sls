@@ -3,7 +3,7 @@
 from shlex import quote
 from textwrap import dedent
 
-from salt://lib/qubes.sls import updateable, template, physical
+from salt://lib/qubes.sls import updateable, template, physical, dom0
 from salt://prometheus/exporter/node_exporter/config.sls import config
 from salt://lib/defs.sls import ReloadSystemdOnchanges, SystemdSystemDropin
 from salt://build/repo/client/lib.sls import rpm_repo
@@ -25,7 +25,7 @@ if updateable():
     ).requisite
     p = Mypkg.installed(
         f"{name}-pkg",
-        name=name,
+        name=name if not dom0() else "golang-github-prometheus-node-exporter",
         require=[rpm_repo(), oldp],
     ).requisite
 else:
@@ -62,7 +62,7 @@ collectorcreate = Service.running(
     require_in=[Test("Collector directory created")],
 )
 
-old_dropin = File.absent("/etc/systemd/system/node_exporter.service.d", onchanges_in=[daemonreload]).requisite
+old_dropin = File.absent("/etc/systemd/system/node_exporter.service.d", onchanges_in=[daemonreload], require=[p]).requisite
 
 collectorwait, collectorwait_reload = SystemdSystemDropin(
     "prometheus-node-exporter",
@@ -106,4 +106,5 @@ svcrunning = Service.running(
     watch=svcwatch,
     require=svcrequire,
     enable=True,
+    require_in=Test("Before restarting collectors"),
 ).requisite
