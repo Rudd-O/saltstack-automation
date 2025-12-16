@@ -118,7 +118,7 @@ for item in before.d after.d global imapsieve ; do
     correctcontext=$(ls -Z -1 "$compiled" | grep dovecot_etc_t || true)
     if [ "$agescript" -gt "$agecompiled" -o -z "$correctcontext" ] ; then
         echo "Compiling $script to $compiled..." >&2
-        sievec -x '+vnd.dovecot.pipe +vnd.dovecot.execute +vnd.dovecot.filter' "$script"
+        sievec -x '+vnd.dovecot.pipe +vnd.dovecot.filter' "$script"
         chcon -u system_u -t dovecot_etc_t "$compiled"
         changed=yes
     fi

@@ -40,18 +40,23 @@ mailbox Archive {
   }
 }
 
+log_debug = category=sieve
+
 sieve_script_active_path = ~/.dovecot.sieve
 sieve_script personal {
   path = ~/sieve
 }
 sieve_script before {
   path = /var/lib/sieve/before.d
+  type = before
 }
 sieve_script after {
   path = /var/lib/sieve/after.d
+  type = after
 }
 sieve_script global {
   path = /var/lib/sieve/global
+  type = global
 }
 
 sieve_plugins {
@@ -80,7 +85,7 @@ imapsieve_from SPAM {
 sieve_pipe_bin_dir = /usr/local/libexec/sieve
 sieve_filter_bin_dir = /usr/local/libexec/sieve
 
-sieve_global_extensions = vnd.dovecot.pipe vnd.dovecot.execute vnd.dovecot.filter
+sieve_global_extensions = vnd.dovecot.pipe vnd.dovecot.filter
 
 protocols {
   imap = yes
