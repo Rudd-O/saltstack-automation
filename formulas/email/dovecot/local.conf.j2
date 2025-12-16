@@ -16,6 +16,30 @@ mail_driver = mbox
 mail_path = ~/mail
 {%   endif -%}
 
+mailbox SPAM {
+  special_use {
+    \Junk = yes
+  }
+}
+
+mailbox Trash {
+  special_use {
+    \Trash = yes
+  }
+}
+
+mailbox Drafts {
+  special_use {
+    \Drafts = yes
+  }
+}
+
+mailbox Archive {
+  special_use {
+    \Archive = yes
+  }
+}
+
 sieve_script_active_path = ~/.dovecot.sieve
 sieve_script personal {
   path = ~/sieve
@@ -40,14 +64,16 @@ mailbox SPAM {
     type = before
     cause = copy
     path = /var/lib/sieve/imapsieve
+    name = report-spam
   }
 }
 
 imapsieve_from SPAM {
   sieve_script report-ham {
-    cause = copy
     type = before
+    cause = copy
     path = /var/lib/sieve/imapsieve
+    name = report-ham
   }
 }
 
