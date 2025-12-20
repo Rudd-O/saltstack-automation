@@ -115,19 +115,6 @@ protocol imap {
   mail_max_userip_connections = 20
 }
 
-{%- endif %}{# enable #}
-
-service auth {
-  unix_listener /var/spool/postfix/private/auth {
-    group = postfix
-    mode = 0666
-    user = postfix
-  }
-  unix_listener auth-userdb {
-    mode = 0660
-  }
-}
-
 service lmtp {
   unix_listener /var/spool/postfix/private/dovecot-lmtp {
     group = postfix
@@ -143,13 +130,38 @@ protocol lmtp {
   auth_username_format = %{ user | username }
 }
 
+{%- endif %}{# enable #}
+
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    group = postfix
+    mode = 0666
+    user = postfix
+  }
+  unix_listener auth-userdb {
+    mode = 0660
+  }
+}
+
 mail_access_groups=mail
 auth_allow_cleartext = no
-{% if enable %}
+
+{%- if enable %}
 ssl = required
 ssl_server_cert_file = {{ tls_cert_file }}
 ssl_server_key_file = {{ tls_key_file }}
 ssl_server_dh_file = /etc/dovecot/dh.pem
 ssl_server_prefer_ciphers = server # >Dovecot 2.2.6
 # ssl_dh_parameters_length = 4096 # >Dovecot 2.2
-{% endif %}
+{%- endif %}
+
+{%- if stats.enable %}
+service stats {
+  inet_listener http {
+    port = {{ stats.port }}
+  }
+}
+{%-   for metric in stats.metrics %}
+{{      metric }}
+{%-   endfor %}
+{%- endif %}

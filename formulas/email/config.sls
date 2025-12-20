@@ -34,6 +34,24 @@ defaults = {
     "mda": {
         "enable": None,  # Means MDA will only be enabled if recipients are listed.
         "mailbox_type": "maildir",
+        "stats": {
+            "enable": False,
+            "port": 9900,
+            "metrics": [
+                """\
+metric auth_success {
+  filter = (event=auth_request_finished AND success=yes)
+}""",
+                """\
+metric auth_failure {
+  filter = (event=auth_request_finished AND success=no)
+}""",
+                """\
+metric mail_delivery_finished {
+  filter = event=mail_delivery_finished
+}""",
+            ],
+        },
         "spam": {
             "file_spam_after_user_scripts": False,
             "train_spam_filter_with_incoming_mail": False,

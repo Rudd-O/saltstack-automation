@@ -227,3 +227,16 @@ all the user classifier sieve scripts have executed.
 
 The default is to file e-mail as spam as soon as it is detected as spam,
 skipping user sieve scripts.
+
+### `stats`
+
+A dictionary permitting the configuration of stats (disabled by default)
+where the following values can be set:
+
+* `enable`: if true, enables statistics collection and exporting in a
+  way compatible with Prometheus.
+* `port`: TCP port where the Prometheus service will serve metrics, at
+  the `/metrics` endpoint.
+* `metrics`: which metrics to export (minimal defaults if enabled); see
+  https://doc.dovecot.org/2.3/configuration_manual/stats/openmetrics/ for
+  more information.
