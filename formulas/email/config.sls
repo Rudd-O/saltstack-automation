@@ -50,6 +50,14 @@ metric auth_failure {
 metric mail_delivery_finished {
   filter = event=mail_delivery_finished
 }""",
+                """\
+metric mail_delivery_successes {
+  filter = (event=mail_delivery_finished AND error="")
+}""",
+                """\
+metric mail_delivery_failures {
+  filter = (event=mail_delivery_finished AND NOT error="")
+}""",
             ],
         },
         "spam": {
