@@ -135,20 +135,27 @@ def SystemUserForContainers(id_, shell=None, **kwargs):
 
     contexts_needed = Cmd.run(
         f"Verify container contexts need to be created for {id_}",
-        name="semanage fcontext -l | grep -q ^/var/lib.*local/share/containers/storage && echo changed=no || echo changed=yes",
+        name=(
+            "semanage fcontext -l | grep  '^/var/lib/[[][x^]/../'..local/share/containers/storage && echo changed=no || echo changed=yes"
+            if not pillar("force_selinux_contexts")
+            else "echo changed=yes"
+        ),
         stateful=True,
     ).requisite
 
     contexts_present = []
     for n, (path_re, setype) in enumerate([
-        ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/artifacts(/.*)?', 'container_ro_file_t'),
-        ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay(/.*)?', 'container_ro_file_t') ,
-        ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay-images(/.*)?', 'container_ro_file_t'),
-        ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay-layers(/.*)?', 'container_ro_file_t'),
-        ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay2(/.*)?', 'container_ro_file_t'),
-        ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay2-images(/.*)?', 'container_ro_file_t'),
-        ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/overlay2-layers(/.*)?', 'container_ro_file_t'),
-        ('/var/lib/[^/]/[^/]+/\\.local/share/containers/storage/volumes/[^/]*/.*', 'container_file_t'),
+        ('/var/lib/[^/]+/\\.local/share/containers/storage/artifacts(/.*)?', 'container_ro_file_t'),
+        ('/var/lib/[^/]+/\\.local/share/containers/storage/overlay(/.*)?', 'container_ro_file_t'),
+        ('/var/lib/[^/]+/\\.local/share/containers/storage/overlay-containers(/.*)?', 'container_ro_file_t'),
+        ('/var/lib/[^/]+/\\.local/share/containers/storage/overlay-images(/.*)?', 'container_ro_file_t'),
+        ('/var/lib/[^/]+/\\.local/share/containers/storage/overlay-layers(/.*)?', 'container_ro_file_t'),
+        ('/var/lib/[^/]+/\\.local/share/containers/storage/overlay2(/.*)?', 'container_ro_file_t'),
+        ('/var/lib/[^/]+/\\.local/share/containers/storage/overlay2-containers(/.*)?', 'container_ro_file_t'), 
+        ('/var/lib/[^/]+/\\.local/share/containers/storage/overlay2-images(/.*)?', 'container_ro_file_t'), 
+        ('/var/lib/[^/]+/\\.local/share/containers/storage/overlay2-layers(/.*)?', 'container_ro_file_t'),
+        ('/var/lib/[^/]+/\\.local/share/containers/storage/volumes/[^/]*/.*', 'container_file_t'),
+        ('/var/lib/[^/]+/\\.cache/containers(/.*)?', 'container_var_lib_t'),
     ]):
         contexts_present.append(
             Selinux.fcontext_policy_present(
@@ -178,7 +185,7 @@ def SystemUserForContainers(id_, shell=None, **kwargs):
 
     context_applied = Selinux.fcontext_policy_applied(
         f"Apply SELinux contexts for containers of {id_}",
-        name=f"/var/lib/{id_}/.local/share/containers",
+        name=f"/var/lib/{id_}",
         recursive=True,
         onchanges=contexts_present + [contexts_needed] + [localsharecontainers, containerbind],
     ).requisite
