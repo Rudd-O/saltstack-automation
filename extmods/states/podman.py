@@ -249,7 +249,7 @@ def quadlet_present(
     environment = "\n".join([f"Environment={e}" for e in environment]) if environment else ""
     environment_file = f"EnvironmentFile={environment_file}\n" if environment_file else ""
     port_forwards = "\n".join([f"PublishPort={e}" for e in port_forwards]) if port_forwards else ""
-    volumes = "\n".join([f"Volume={e}" for e in volumes]) if volumes else ""
+    volumes = "\n".join([f"Volume={e}:{f}" for e, f in volumes.items()]) if volumes else ""
     unit_stanzas = "\n".join([f"{e}" for e in unit_stanzas]) if unit_stanzas else ""
     network = f"Network={network}" if network else ""
     userns = f"UserNS={userns}" if userns else ""
@@ -269,6 +269,10 @@ Image={image}
 {network}
 {userns}
 {args}
+
+[Service]
+# Extend Timeout to allow time to pull the image
+TimeoutStartSec=900
 
 [Install]
 WantedBy=default.target
