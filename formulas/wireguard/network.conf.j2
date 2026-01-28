@@ -9,11 +9,13 @@ PrivateKey = {{ peers[me].privkey }}
 SaveConfig = false{% endif %}
 ListenPort = {{ port }}
 # Ping the known peers to hasten awakening of connectivity.
-{%- if saveconfig | default(True) %}
+{%- if not star and saveconfig | default(True) %}
 PostUp = {%   for n, c in peers.items() %}{% if n != me %}ping -c1 {{ c.subnet.split("/")[0].split(",")[0] }} || true & {% endif %}{% endfor %}wait
 {%- endif %}
 {%- for name, c in peers.items() %}
-{%-   if name == me %}{% else %}
+{%-   if name == me -%}
+{%-   elif star and c.address|default(None) is none and peers[me].address|default(None) is none -%}
+{% else %}
 
 [Peer]
 # {{ name }} for {{ me }}
