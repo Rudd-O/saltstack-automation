@@ -50,9 +50,11 @@ rld = Userservice.systemd_reload(
 if not template():
     domain = pillar("whiteboard:domain")
     jwt = pillar("whiteboard:jwt_secret_key")
+    payload_size_mb = pillar("whiteboard:payload_size_mb", 50)
     env = File.managed(
         "/etc/default/whiteboard",
         contents=f"""NEXTCLOUD_URL=https://{domain}
+MAX_UPLOAD_FILE_SIZE={payload_size_mb}
 JWT_SECRET_KEY={jwt}""",
         user="root",
         group="whiteboard",
