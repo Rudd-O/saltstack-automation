@@ -19,8 +19,10 @@ http {
                       '$status $body_bytes_sent "$http_referer" '
                       '"$http_user_agent" "$http_x_forwarded_for" '
                       'rt="$request_time" uct="$upstream_connect_time" uht="$upstream_header_time" urt="$upstream_response_time"';
+{#-   log_format postdata '$remote_addr - "$http_user_agent" - "$request" - $request_body'; #}
 
     access_log  /var/log/nginx/access.log  main;
+{#-   access_log  /var/log/nginx/postdata.log  postdata; #}
 
     # WebSockets.
     map $http_upgrade $connection_upgrade {
@@ -31,6 +33,7 @@ http {
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection $connection_upgrade;
+    {#- proxy_set_header Sec-Websocket-Extensions ''; FIXME REMOVE ME #}
     # End WebSockets.
 
     ssl_ciphers PROFILE=SYSTEM;

@@ -488,10 +488,10 @@ php_admin_value[max_execution_time] = 150
     qdbpassword = quote(context["database"]["password"])
     qadminuser = quote(context["admin"]["user"])
     qadminpassword = quote(context["admin"]["password"])
-    setup_cmd = occ(f"occ maintenance:install --data-dir /var/lib/nextcloud/data/ --database mysql --database-name {qdbname} --database-user {qdbuser} --database-pass {qdbpassword} --admin-user {qadminuser} --admin-pass {qadminpassword}")
+    setup_cmd = occ(f"maintenance:install --data-dir /var/lib/nextcloud/data/ --database mysql --database-name {qdbname} --database-user {qdbuser} --database-pass {qdbpassword} --admin-user {qadminuser} --admin-pass {qadminpassword}")
     setup = Cmd.run(
         "Setup nextcloud",
-        name=f"set -e ; php {setup_cmd} ; touch /var/lib/nextcloud/.setup",
+        name=f"set -e ; {setup_cmd} ; touch /var/lib/nextcloud/.setup",
         runas="apache",
         cwd="/usr/share/nextcloud",
         creates="/var/lib/nextcloud/.setup",
@@ -499,6 +499,36 @@ php_admin_value[max_execution_time] = 150
     ).requisite
 
     if 0:
+        cfg = Cmd.run(
+            "Set Nextcloud file locking to use Redis",
+            name=f"{occ(f"config:system:set memcache.locking --type=string --value '\\OC\\Memcache\\Redis'")}",
+            runas="apache",
+            cwd="/usr/share/nextcloud",
+            require=[setup],
+        ).requisite
+        cfg = Cmd.run(
+            "Set Nextcloud cache to use Redis",
+            name=f"{occ(f"config:system:set memcache.distributed --type=string --value '\\OC\\Memcache\\Redis'")}",
+            runas="apache",
+            cwd="/usr/share/nextcloud",
+            require=[setup],
+        ).requisite
+        cfg = Cmd.run(
+            "Set Redis host",
+            name=f"{occ(f"config:system:set redis host --type=string --value 127.0.0.1")}",
+            runas="apache",
+            cwd="/usr/share/nextcloud",
+            require=[cfg],
+        ).requisite
+        cfg = Cmd.run(
+            "Set Redis port",
+            name=f"{occ(f"config:system:set redis port --type=integer --value 6379")}",
+            runas="apache",
+            cwd="/usr/share/nextcloud",
+            require=[cfg],
+        ).requisite
+        # FIXME add password authentication to Redis.
+        # FIXME port below to use technique above, but make technique above into state factory function calls.
         arr = ", ".join(f"{n} => '{td}'" for n, td in enumerate(context["trusted_domains"]))
         r1 = File.replace(
             "trusted_domains setting",
@@ -506,7 +536,7 @@ php_admin_value[max_execution_time] = 150
             pattern=".CONFIG[[].trusted_domains.[]].*",
             repl=f"$CONFIG['trusted_domains'] = array({arr});",
             append_if_not_found=True,
-            require=[setup, logsbind],
+            require=[cfg],
         ).requisite
         arr = ", ".join(f"{n} => '{td}'" for n, td in enumerate(context["trusted_proxies"]))
         r2 = File.replace(

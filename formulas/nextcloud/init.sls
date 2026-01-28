@@ -1,5 +1,6 @@
 include:
 - .database
+- .valkey
 - .program
 - .files_actions
 
@@ -18,5 +19,6 @@ extend:
     test:
     - require:
       - test: Nextcloud database environment defined
+      - test: Redis setup
 
 {% endif %}
