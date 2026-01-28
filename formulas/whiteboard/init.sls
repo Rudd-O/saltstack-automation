@@ -54,7 +54,6 @@ if not template():
         "/etc/default/whiteboard",
         contents=f"""NEXTCLOUD_URL=https://{domain}
 JWT_SECRET_KEY={jwt}""",
-        onchanges_in=[rld],
         user="root",
         group="whiteboard",
         mode="0640",

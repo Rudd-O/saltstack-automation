@@ -79,7 +79,59 @@ def running(name, user, enable=False):
         "changes": {**startret["changes"], **enableret["changes"]},
     }
     return ret
-    
+
+
+def mod_watch(
+    name,
+    sfun=None,
+    sig=None,
+    reload=False,
+    full_restart=False,
+    init_delay=None,
+    force=False,
+    **kwargs
+):
+    #import pprint
+    #assert 0, pprint.pformat((name, sfun, sig, reload, full_restart, init_delay, force, kwargs))
+
+    ret = {"name": name, "changes": {}, "result": True, "comment": ""}
+    past_participle = None
+
+    if sfun == "dead":
+        verb = "stop"
+        past_participle = verb + "ped"
+    elif sfun == "running":
+        ret["name"] = name
+        if True or __salt__["userservice.status"](name, sig, **status_kwargs):
+            verb = "restart"
+        else:
+            verb = "start"
+        if not past_participle:
+            past_participle = verb + "ed"
+    else:
+        ret["comment"] = "Unable to trigger watch for service.{}".format(sfun)
+        ret["result"] = False
+        return ret
+
+    if __opts__["test"]:
+        ret["result"] = None
+        ret["comment"] = "Service is set to be {}".format(past_participle)
+        return ret
+
+    if verb == "restart":
+        # stop service before start
+        r = dead(name, kwargs["user"])
+        if r["result"] is False:
+            return r
+        r = running(name, kwargs["user"])
+        return r
+    elif verb == "stop":
+        # stop service before start
+        r = dead(name, kwargs["user"])
+        return r
+    else:
+        assert 0, "not reached"
+
 
 def dead(name, user):
     startret = dict(result=False, changes={}, name=name, comment="Fallthrough error 2")
