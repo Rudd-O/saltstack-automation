@@ -133,62 +133,7 @@ def SystemUser(id_, shell=None, **kwargs):
 def SystemUserForContainers(id_, shell=None, **kwargs):
     u = SystemUser(id_, shell=shell, **kwargs)
 
-    contexts_needed = Cmd.run(
-        f"Verify container contexts need to be created for {id_}",
-        name=(
-            "semanage fcontext -l | grep  '^/var/lib/[[][x^]/../'..local/share/containers/storage && echo changed=no || echo changed=yes"
-            if not pillar("force_selinux_contexts")
-            else "echo changed=yes"
-        ),
-        stateful=True,
-    ).requisite
-
-    contexts_present = []
-    for n, (path_re, setype) in enumerate([
-        ('/var/lib/[^/]+/\\.local/share/containers/storage/artifacts(/.*)?', 'container_ro_file_t'),
-        ('/var/lib/[^/]+/\\.local/share/containers/storage/overlay(/.*)?', 'container_ro_file_t'),
-        ('/var/lib/[^/]+/\\.local/share/containers/storage/overlay-containers(/.*)?', 'container_ro_file_t'),
-        ('/var/lib/[^/]+/\\.local/share/containers/storage/overlay-images(/.*)?', 'container_ro_file_t'),
-        ('/var/lib/[^/]+/\\.local/share/containers/storage/overlay-layers(/.*)?', 'container_ro_file_t'),
-        ('/var/lib/[^/]+/\\.local/share/containers/storage/overlay2(/.*)?', 'container_ro_file_t'),
-        ('/var/lib/[^/]+/\\.local/share/containers/storage/overlay2-containers(/.*)?', 'container_ro_file_t'), 
-        ('/var/lib/[^/]+/\\.local/share/containers/storage/overlay2-images(/.*)?', 'container_ro_file_t'), 
-        ('/var/lib/[^/]+/\\.local/share/containers/storage/overlay2-layers(/.*)?', 'container_ro_file_t'),
-        ('/var/lib/[^/]+/\\.local/share/containers/storage/volumes/[^/]*/.*', 'container_file_t'),
-        ('/var/lib/[^/]+/\\.cache/containers(/.*)?', 'container_var_lib_t'),
-    ]):
-        contexts_present.append(
-            Selinux.fcontext_policy_present(
-                f"Set up SELinux contexts for containers of {id_} at {n}",
-                name=path_re,
-                filetype="a",
-                sel_user="system_u",
-                sel_type=setype,
-                onchanges=[contexts_needed],
-            ).requisite
-        )
-
-    localsharecontainers = File.directory(
-        f"/var/lib/{id_}/.local/share/containers",
-        user=id_,
-        group=id_,
-        mode="0700",
-        makedirs=True,
-        require=[u] + contexts_present,
-    ).requisite
-
-    containerbind = Qubes.bind_dirs(
-        f'{id_}-containers',
-        directories=[f'/var/lib/{id_}/.local/share/containers'],
-        require=[localsharecontainers],
-    ).requisite
-
-    context_applied = Selinux.fcontext_policy_applied(
-        f"Apply SELinux contexts for containers of {id_}",
-        name=f"/var/lib/{id_}",
-        recursive=True,
-        onchanges=contexts_present + [contexts_needed] + [localsharecontainers, containerbind],
-    ).requisite
+    include("podman.usercontainer")
 
     subgid = Podman.allocate_subgid_range(
         f"{id_} subgid",
@@ -204,7 +149,114 @@ def SystemUserForContainers(id_, shell=None, **kwargs):
         require=[u],
     ).requisite
 
+    localsharecontainers = File.directory(
+        f"/var/lib/{id_}/.local/share/containers",
+        user=id_,
+        group=id_,
+        mode="0700",
+        makedirs=True,
+        require=[u, Test("User containers experienced SELinux changes")],
+    ).requisite
+
+    containerbind = Qubes.bind_dirs(
+        f'{id_}-containers',
+        directories=[f'/var/lib/{id_}/.local/share/containers'],
+        require=[localsharecontainers],
+    ).requisite
+
+    context_applied = Selinux.fcontext_policy_applied(
+        f"Apply SELinux contexts for containers of {id_}",
+        name=f"/var/lib/{id_}",
+        recursive=True,
+        onchanges=[Test("User containers experienced SELinux changes"), containerbind],
+    ).requisite
+
     return [u, localsharecontainers, containerbind, context_applied, subgid, subuid]
+
+
+def SystemUserContainer(id_, username, image, environment_template=None, environment_context=None, volumes=None, version=None, args=None):
+    args = [] if not args else args
+
+    u, localsharecontainers, containerbind, context_applied, subgid, subuid = SystemUserForContainers(
+        username,
+        shell="/sbin/nologin",
+    )
+
+    if version:
+        version = f":{version}"
+
+    q = Podman.quadlet_present(
+        id_,
+        image=f"{image}{version}",
+        environment_file=f"/etc/default/{id_}" if environment_template else None,
+        network="host",
+        userns="keep-id",
+        args=args,
+        enable=True,
+        runas=username,
+        makedirs=True,
+        volumes={} if not volumes else {
+            f"/var/lib/{username}/{n}": f"{m}:Z" for n, m in volumes.items()
+        },
+        require=[subuid, subgid] + [containerbind, context_applied],
+    ).requisite
+
+    qubified = Qubes.enable_dom0_managed_service(
+        f"{id_} qubified",
+        name=id_,
+        require=[q],
+        scope="user",
+        enable=False,
+    ).requisite
+
+    rld = Userservice.systemd_reload(
+        f"daemon-reload for {sls}",
+        user=username,
+        onchanges=[q, qubified],
+    ).requisite
+
+    if not grains('qubes:vm_type') == "TemplateVM": # Cannot import template() because recursion
+        if environment_template is not None:
+            env = File.managed(
+                f"/etc/default/{id_}",
+                contents=environment_template,
+                context=environment_context,
+                template="jinja",
+                user="root",
+                group=username,
+                mode="0640",
+                require=[u],
+            ).requisite
+        else:
+            env = File.absent(f"/etc/default/{id_}").requisite
+        datadirs = [] if not volumes else [File.directory(
+            f"/var/lib/{username}/{volume}",
+            makedirs=True,
+            mode="0700",
+            user=username,
+            group=username,
+            require=[u],
+        ).requisite for volume in volumes]
+        lng = Userservice.linger(
+            f"Linger {username}",
+            user=username,
+            require=[u],
+        ).requisite
+        envbind = Qubes.bind_dirs(
+            id_,
+            directories=[f'/etc/default/{id_}', f'/var/lib/systemd/linger/{username}'] + (
+                [] if not volumes else [f"/var/lib/{username}/{volume}" for volume in volumes]
+            ),
+            require=[lng] + datadirs + ([env] if environment_template is not None else []),
+            require_in=([env] if environment_template is None else [])
+        ).requisite
+        rn = Userservice.running(
+            id_,
+            user=username,
+            enable=True,
+            require=[rld, lng],
+            watch=[q, env, envbind],
+        )
 
 
 # Deprecate me with the state SshKeypair.present.
