@@ -12,7 +12,7 @@ memories_index_arguments = "-g Parents --skip-cleanup"
 preview_generator_arguments = "Rudd-O Lidia"
 
 def occ(cmd):
-    return f"nice -n 20 /usr/bin/php -d sys_temp_dir={TMPDIR} -d upload_temp_dir={TMPDIR} -d memory_limit={MEM} -f /usr/share/nextcloud/occ {cmd}"
+    return f"nice -n 20 /usr/bin/php -d sys_temp_dir={TMPDIR} -d upload_tmp_dir={TMPDIR} -d memory_limit={MEM} -f /usr/share/nextcloud/occ {cmd}"
 
 def timer_driven_unit(name, description, command, onbootsec, onunitinactivesec, require=None, watch=None, type=None):
     if fully_persistent_or_physical():
@@ -133,7 +133,7 @@ if fully_persistent_or_physical():
         contents=dedent(f"""\
         [Service]
         ExecStart=
-        ExecStart=/usr/bin/php -d sys_temp_dir={TMPDIR} -d upload_temp_dir={TMPDIR} -d memory_limit={MEM} -f /usr/share/nextcloud/cron.php
+        ExecStart=/usr/bin/php -d sys_temp_dir={TMPDIR} -d upload_tmp_dir={TMPDIR} -d memory_limit={MEM} -f /usr/share/nextcloud/cron.php
         """),
         require=cronqubified,
         makedirs=True,
@@ -375,7 +375,7 @@ Redirect 301 /.well-known/nodeinfo   /index.php/.well-known/nodeinfo
         RewriteCond %{REQUEST_FILENAME} !\.(css|js|mjs|svg|gif|ico|jpg|jpeg|png|webp|html|otf|ttf|woff2?|map|webm|mp4|mp3|ogg|wav|flac|wasm|tflite|mkv)$
         RewriteCond %{REQUEST_FILENAME} !/core/ajax/update\.php
         RewriteCond %{REQUEST_FILENAME} !/core/img/(favicon\.ico|manifest\.json)$
-        RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status)\.php
+        RewriteCond %{REQUEST_FILENAME} !/(cron|public|remote|status""" + ("|phpinfo" if context.get("phpinfo") else "") + r""")\.php
         RewriteCond %{REQUEST_FILENAME} !/ocs/v(1|2)\.php
         RewriteCond %{REQUEST_FILENAME} !/robots\.txt
         RewriteCond %{REQUEST_FILENAME} !/(ocs-provider|updater)/
@@ -433,17 +433,39 @@ Redirect 301 /.well-known/nodeinfo   /index.php/.well-known/nodeinfo
         require=[tmpdir],
     ).requisite
     phpsettings = File.managed(
-        "/etc/php-fpm.d/nextcloud-custom.conf",
+        "/etc/php-fpm.d/nextcloud.conf",
         contents="""[nextcloud]
-php_admin_value[memory_limit] = {{ memory_limit }}
-php_admin_value[opcache.jit] = 1255
-php_admin_value[opcache.jit_buffer_size] = 8M
-php_admin_value[opcache.interned_strings_buffer] = 64
-php_admin_value[upload_max_filesize] = {{ max_upload_size | default("50M") }}
-php_admin_value[post_max_size] = {{ max_upload_size | default("50M") }}
-php_admin_value[sys_temp_dir] = {{ temp_directory }}
-php_admin_value[upload_temp_dir] = {{ temp_directory }}
-php_admin_value[max_execution_time] = 150
+user = apache
+group = apache
+listen = /run/php-fpm/nextcloud.sock
+listen.acl_users = apache,nginx
+listen.allowed_clients = 127.0.0.1
+pm = dynamic
+pm.max_children = 50
+pm.start_servers = 5
+pm.min_spare_servers = 5
+pm.max_spare_servers = 35
+slowlog = /var/log/php-fpm/nextcloud-slow.log
+php_admin_value[error_log] = /var/log/php-fpm/nextcloud-error.log
+php_admin_flag[log_errors] = on
+php_value[session.save_handler] = files
+php_value[session.save_path]    = /var/lib/php/session
+php_value[soap.wsdl_cache_dir]  = /var/lib/php/wsdlcache
+php_value[memory_limit] = {{ memory_limit }}
+php_value[upload_max_filesize] = {{ max_upload_size | default("50M") }}
+php_value[post_max_size] = {{ max_upload_size | default("50M") }}
+php_value[opcache.jit] = 1255
+php_value[opcache.jit_buffer_size] = 8M
+php_value[opcache.interned_strings_buffer] = 64
+php_value[sys_temp_dir] = {{ temp_directory }}
+php_value[upload_tmp_dir] = {{ temp_directory }}
+php_value[max_execution_time] = 150
+php_flag[output_buffering] = off
+env[HOSTNAME] = $HOSTNAME
+env[PATH] = /usr/local/bin:/usr/bin:/bin
+env[TMP] = {{ temp_directory }}
+env[TMPDIR] = {{ temp_directory }}
+env[TEMP] = {{ temp_directory }}
 """,
         template="jinja",
         context=context,
@@ -451,7 +473,7 @@ php_admin_value[max_execution_time] = 150
     ).requisite
     phpsettings_binddir = Qubes.bind_dirs(
         '90-nextcloud-php-fpm',
-        directories=["/etc/php-fpm.d/nextcloud-custom.conf"],
+        directories=["/etc/php-fpm.d/nextcloud.conf"],
         require=[phpsettings],
     ).requisite
     nextcloud_binddirs = Qubes.bind_dirs(
@@ -498,13 +520,23 @@ php_admin_value[max_execution_time] = 150
         require=[s1, s2],
     ).requisite
 
+    cfg = setup
+    if chunk_size := context.get("web_client_upload_chunk_size"):
+        cfg = Cmd.run(
+            "Set chunk size for uploads through the Web client",
+            name=f"{occ(f"config:system:set files.chunked_upload.max_size --type=integer --value {chunk_size}")}",
+            runas="apache",
+            cwd="/usr/share/nextcloud",
+            require=[cfg],
+        ).requisite
+
     if 0:
         cfg = Cmd.run(
             "Set Nextcloud file locking to use Redis",
             name=f"{occ(f"config:system:set memcache.locking --type=string --value '\\OC\\Memcache\\Redis'")}",
             runas="apache",
             cwd="/usr/share/nextcloud",
-            require=[setup],
+            require=[cfg],
         ).requisite
         cfg = Cmd.run(
             "Set Nextcloud cache to use Redis",
