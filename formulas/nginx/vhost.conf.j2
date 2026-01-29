@@ -1,4 +1,5 @@
-
+{% if before_server is defined %}{{ before_server }}
+{% endif %}
 {%- if ssl_certificate is defined and ssl_certificate_key is defined %}
 {%-   if not ports is defined %}{% set ports = [443] %}{% endif %}
 

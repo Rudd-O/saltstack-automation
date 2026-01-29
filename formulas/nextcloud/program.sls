@@ -335,6 +335,11 @@ Redirect 301 /.well-known/nodeinfo   /index.php/.well-known/nodeinfo
 
 # LogLevel alert rewrite:trace3
 
+# Delete any possibility of buffering packets.
+<Proxy fcgi://localhost>
+    ProxySet flushpackets=auto
+</Proxy>
+
 <Directory /usr/share/nextcloud/>
     LogLevel info
     LimitRequestBody 0
