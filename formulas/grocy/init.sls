@@ -14,7 +14,7 @@ include(f"{sls}.ssl")
 
 deps = Pkg.installed(
     "grocy deps",
-    pkgs=["grocy"],
+    pkgs=["grocy", "php-intl"],
 ).requisite
 
 q = Qubes.enable_dom0_managed_service("php-fpm", require=[deps]).requisite
