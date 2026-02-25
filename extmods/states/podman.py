@@ -450,7 +450,11 @@ def pod_running(name, options, containers, dryrun=False, enable=None):
         for existing_container in existing_containers:
             o = co(["podman", "container", "inspect", existing_container])
             v = json.loads(o)
-            existing_container_cmds.append(v[0]["Config"]["CreateCommand"])
+            try:
+                existing_container_cmds.append(v[0]["Config"]["CreateCommand"])
+            except KeyError:
+                # Infra container, does not have a start command.
+                existing_container_cmds.append(["infra"])
 
     existing_container_cmds_equal = True
     if len(container_cmds) + 1 != len(existing_container_cmds):
