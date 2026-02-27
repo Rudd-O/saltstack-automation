@@ -15,12 +15,14 @@ if fully_persistent_or_physical() or dom0():
         "Check ZFS module before",
         name=tpl % {"stage": "before", "what": "zfs-dkms"},
         creates="/var/cache/salt/zfs-dkms/before",
+        stateful=True,
     )
 
     cdidepbefore = [Cmd.run(
-       "Check NVIDIA drivers before",
-       name=tpl % {"stage": "before", "what": "nvidia"},
-       creates="/var/cache/salt/nvidia/before",
+        "Check NVIDIA drivers before",
+        name=tpl % {"stage": "before", "what": "nvidia"},
+        creates="/var/cache/salt/nvidia/before",
+        stateful=True,
     ).requisite] if cdi else []
 
     updreq = Mypkg.uptodate(
