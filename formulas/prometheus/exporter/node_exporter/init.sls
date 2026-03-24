@@ -25,7 +25,7 @@ if updateable():
     ).requisite
     p = Mypkg.installed(
         f"{name}-pkg",
-        name=name if not dom0() else "golang-github-prometheus-node-exporter",
+        name=name,
         require=[rpm_repo(), oldp],
     ).requisite
 else:
