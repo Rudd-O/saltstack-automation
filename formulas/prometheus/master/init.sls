@@ -6,17 +6,18 @@ from salt://prometheus/config.sls import config
 from salt://build/repo/client/lib.sls import rpm_repo
 
 
-pkgs = ["prometheus2", "alertmanager"]
+pkgs = ["prometheus", "alertmanager"]
 svcs = pkgs[:]
-svcs.remove('prometheus2')
-svcs.append('prometheus')
+svcs.remove('alertmanager')
+svcs.append('prometheus-alertmanager')
 
 
 if fully_persistent_or_physical() and not dom0():
+    old = Pkg.removed("prometheus2").requisite
     with Pkg.latest(
         "prometheus-packages",
         pkgs=pkgs,
-        require=[rpm_repo()],
+        require=[rpm_repo(), old],
     ):
         for svc in svcs:
             Qubes.enable_dom0_managed_service(
@@ -41,7 +42,7 @@ if rw_only_or_physical() and not dom0():
         'prometheus-config',
         directories=[
             '/etc/default/prometheus',
-            '/etc/default/alertmanager',
+            '/etc/default/prometheus-alertmanager',
             '/etc/prometheus/prometheus.yml',
             '/etc/prometheus/alerting.rules',
             '/etc/prometheus/recording.rules',
@@ -60,13 +61,13 @@ if rw_only_or_physical() and not dom0():
     for svc in svcs:
         binds = [Qubes("prometheus"), Qubes("prometheus-config")]
         Service.running(svc, require=binds)
-        if svc in ["prometheus", "alertmanager"]:
+        if svc in ["prometheus", "prometheus-alertmanager"]:
             # These services support reloading.
             Service.running(svc + " (reloaded)", name=svc, reload=True, require=binds)
     with Service("prometheus", "watch_in"):
         File.managed(
             '/etc/default/prometheus',
-            contents="PROMETHEUS_OPTS='" + " ".join([
+            contents="ARGS='" + " ".join([
                 "--web.external-url={{ url }}",
                 "--config.file=/etc/prometheus/prometheus.yml",
                 "--storage.tsdb.path=/var/lib/prometheus/data",
@@ -87,16 +88,16 @@ if rw_only_or_physical() and not dom0():
                 require=[Pkg("prometheus-packages")] if grains('qubes:persistence') == "" else [],
                 require_in=[Qubes("prometheus-config")],
             )
-    with Service("alertmanager", "watch_in"):
+    with Service("prometheus-alertmanager", "watch_in"):
         File.managed(
-            '/etc/default/alertmanager',
-            contents="ALERTMANAGER_OPTS='--web.external-url={{ url }} --storage.path=/var/lib/prometheus/data --config.file=/etc/prometheus/alertmanager.yml'",
+            '/etc/default/prometheus-alertmanager',
+            contents="ARGS='--web.external-url={{ url }} --storage.path=/var/lib/prometheus/alertmanager --config.file=/etc/prometheus/alertmanager.yml'",
             template='jinja',
             context=config.alertmanager,
             require=[Pkg("prometheus-packages")] if grains('qubes:persistence') == "" else [],
             require_in=[Qubes("prometheus-config")],
         )
-    with Service("alertmanager (reloaded)", "watch_in"):
+    with Service("prometheus-alertmanager (reloaded)", "watch_in"):
         for f in ['alertmanager.yml']:
             File.managed(
                 '/etc/prometheus/%s' % f,
