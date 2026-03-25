@@ -76,8 +76,9 @@ def collector(n, ext=None):
         **Perms.file,
     ).requisite
 
-    enabled = Service.enabled(
+    enabled = Service.running(
         f"{n}.timer",
+        enable=True,
         qubes_service_name="node_exporter",
         require=[reloadsystemd, timer],
     ).requisite
