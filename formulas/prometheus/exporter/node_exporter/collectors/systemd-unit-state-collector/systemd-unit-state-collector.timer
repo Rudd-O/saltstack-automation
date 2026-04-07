@@ -3,6 +3,8 @@ Description=Trigger Collect systemd unit metrics
 
 [Timer]
 OnBootSec=60 seconds
+OnBootSec=120 seconds
+OnUnitActiveSec=15 minutes
 
 [Install]
 WantedBy=timers.target
