@@ -79,15 +79,11 @@ def collector(n, ext=None):
     enabled = Service.running(
         f"{n}.timer",
         enable=True,
-        qubes_service_name="node_exporter",
         require=[reloadsystemd, timer],
     ).requisite
 
-    svcwatch = [prog, service, enabled]
-    svcrequire = [timer, reloadsystemd]
-
     exec_ = Cmd.wait(
         f"systemctl --system restart --no-block {n}",
-        watch=svcwatch,
-        require=svcrequire,
+        watch=[prog, service, enabled, timer],
+        require=[reloadsystemd],
     ).requisite
