@@ -105,6 +105,4 @@ def iter():
         print("systemd_unit_state_collector_end_time_seconds %s" % end, file=out)
 
 
-while True:
-    iter()
-    time.sleep(5*60)
+iter()

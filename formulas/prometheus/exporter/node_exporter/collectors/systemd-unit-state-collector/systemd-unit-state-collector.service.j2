@@ -2,5 +2,5 @@
 Description=Collect systemd unit metrics
 
 [Service]
-Type=simple
+Type=oneshot
 ExecStart={{ exe }} systemd-unit-state.prom
