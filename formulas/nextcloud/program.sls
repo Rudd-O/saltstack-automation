@@ -14,6 +14,27 @@ preview_generator_arguments = "Rudd-O Lidia"
 def occ(cmd):
     return f"nice -n 20 /usr/bin/php -d sys_temp_dir={TMPDIR} -d upload_tmp_dir={TMPDIR} -d memory_limit={MEM} -f /usr/share/nextcloud/occ {cmd}"
 
+def configure(setting, valtype, value, **kwargs):
+    getter = occ(f"config:system:get {setting}")
+    setter = occ(f"config:system:set {setting} --type={quote(valtype)} --value {quote(str(value))}")
+    return Cmd.run(
+        f"Set {setting} to {value}",
+        name=f"""
+set -e
+val=$({getter})
+if [ "$val" != {quote(str(value))} ] ; then
+    echo "Setting {setting} value $val is different from" {quote(str(value))} " - updating" >&2
+    {setter}
+    echo
+    echo changed=yes
+fi
+""",
+        runas="apache",
+        cwd="/usr/share/nextcloud",
+        stateful=True,
+        **kwargs,
+    ).requisite
+
 def timer_driven_unit(name, description, command, onbootsec, onunitinactivesec, require=None, watch=None, type=None):
     if fully_persistent_or_physical():
         s = File.managed(
@@ -525,46 +546,18 @@ env[TEMP] = {{ temp_directory }}
         require=[s1, s2],
     ).requisite
 
-    cfg = setup
+    post_setup_config = Test.nop("Post-setup configuration", require=[setup, cachebind], require_in=_q).requisite
+    cfg_kwargs = dict(require=[setup], require_in=[post_setup_config])
     if chunk_size := context.get("web_client_upload_chunk_size"):
-        cfg = Cmd.run(
-            "Set chunk size for uploads through the Web client",
-            name=f"{occ(f"config:system:set files.chunked_upload.max_size --type=integer --value {chunk_size}")}",
-            runas="apache",
-            cwd="/usr/share/nextcloud",
-            require=[cfg],
-        ).requisite
+        configure("web_client_upload_chunk_size", "integer", chunk_size, **cfg_kwargs)
+    configure("loglevel", "integer", context.get("log_level", 1), **cfg_kwargs)
+    # FIXME add password authentication to Redis.
+    configure("redis host", "string", "127.0.0.1", **cfg_kwargs)
+    configure("redis port", "integer", 6379, **cfg_kwargs)
+    configure("memcache.locking", "string", "\\OC\\Memcache\\Redis", **cfg_kwargs)
+    configure("memcache.distributed", "string", "\\OC\\Memcache\\Redis", **cfg_kwargs)
 
     if 0:
-        cfg = Cmd.run(
-            "Set Nextcloud file locking to use Redis",
-            name=f"{occ(f"config:system:set memcache.locking --type=string --value '\\OC\\Memcache\\Redis'")}",
-            runas="apache",
-            cwd="/usr/share/nextcloud",
-            require=[cfg],
-        ).requisite
-        cfg = Cmd.run(
-            "Set Nextcloud cache to use Redis",
-            name=f"{occ(f"config:system:set memcache.distributed --type=string --value '\\OC\\Memcache\\Redis'")}",
-            runas="apache",
-            cwd="/usr/share/nextcloud",
-            require=[setup],
-        ).requisite
-        cfg = Cmd.run(
-            "Set Redis host",
-            name=f"{occ(f"config:system:set redis host --type=string --value 127.0.0.1")}",
-            runas="apache",
-            cwd="/usr/share/nextcloud",
-            require=[cfg],
-        ).requisite
-        cfg = Cmd.run(
-            "Set Redis port",
-            name=f"{occ(f"config:system:set redis port --type=integer --value 6379")}",
-            runas="apache",
-            cwd="/usr/share/nextcloud",
-            require=[cfg],
-        ).requisite
-        # FIXME add password authentication to Redis.
         # FIXME port below to use technique above, but make technique above into state factory function calls.
         arr = ", ".join(f"{n} => '{td}'" for n, td in enumerate(context["trusted_domains"]))
         r1 = File.replace(
@@ -573,7 +566,7 @@ env[TEMP] = {{ temp_directory }}
             pattern=".CONFIG[[].trusted_domains.[]].*",
             repl=f"$CONFIG['trusted_domains'] = array({arr});",
             append_if_not_found=True,
-            require=[cfg],
+            **cfg_kwargs,
         ).requisite
         arr = ", ".join(f"{n} => '{td}'" for n, td in enumerate(context["trusted_proxies"]))
         r2 = File.replace(
@@ -582,7 +575,7 @@ env[TEMP] = {{ temp_directory }}
             pattern=".CONFIG[[].trusted_proxies.[]].*",
             repl=f"$CONFIG['trusted_proxies'] = array({arr});",
             append_if_not_found=True,
-            require=[r1],
+            **cfg_kwargs,
         ).requisite
         primarydomain = context["trusted_domains"][0]
         r3 = File.replace(
@@ -591,7 +584,7 @@ env[TEMP] = {{ temp_directory }}
             pattern=".CONFIG[[].overwrite.cli.url.[]].*",
             repl=f"$CONFIG['overwrite.cli.url'] = 'http://{primarydomain}';",
             append_if_not_found=True,
-            require=[r2],
+            **cfg_kwargs,
         ).requisite
         r4 = File.replace(
             "rewritebase setting",
@@ -599,7 +592,7 @@ env[TEMP] = {{ temp_directory }}
             pattern=".CONFIG[[].htaccess.RewriteBase.[]].*",
             repl=f"$CONFIG['htaccess.RewriteBase'] = '/';",
             append_if_not_found=True,
-            require=[r3],
+            **cfg_kwargs,
         ).requisite
         # not currently managed:
         # * log_level
@@ -613,9 +606,6 @@ env[TEMP] = {{ temp_directory }}
         #   occ config:app:set dav calendarSubscriptionRefreshRate --value PT2H
         # occ maintenance:mimetype:update-db
         # occ maintenance:mimetype:update-js
-
-    # FIXME make the config tasks above be required here.
-    post_setup_config = Test.nop("Post-setup configuration", require=[setup, cachebind], require_in=_q).requisite
 
     # https://github.com/nextcloud/previewgenerator
     preview_install = occ("app:install previewgenerator")
