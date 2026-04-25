@@ -296,6 +296,16 @@ See file [spf/policyd-spf.conf.j2] and documentation for python-policyd-spf for 
 
 ### `dmarc`
 
+DMARC is a policy for mail transfer, which is already supported by some common mail providers.
+It depends on Sender Policy Framework and DKIM. DMARC provides a policy for outgoing mail
+and checks incoming mails for compliance with that policy.
+
+The policy is published via a DNS TXT record. Validation of incoming mail is done in a daemon
+installed by this formula.  The daemon is currently configured to let e-mail pass but stamp
+DMARC-invalid mail with a header `Authentication-Results:...pass` or `...fail` depending
+on whether the DMARC / SPF tests for the received e-mail passed or not.  The OpenDMARC daemon
+relies on the pypolicy-spf SPF checks (done prior to its own checks) this formula sets up.
+
 There are currently no configuration options for DMARC, but you need
 to add records to the domains you will be sending and receving e-mail
 from.  From

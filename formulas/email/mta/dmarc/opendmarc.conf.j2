@@ -376,7 +376,13 @@ SoftwareHeader true
 ##  message.  This is useful if you want the filter to perform SPF checks
 ##  itself, or because you don't trust the arriving header.
 #
-SPFIgnoreResults true
+# The default value is true in the configuration as it ships by Fedora
+# but the mail formula sets up pypolicy-spf to check SPF, so we configure
+# OpenDMARC to trust these headers.
+# If and when we delete pypolicy-spf from the formula (and start relying only
+# on OpenDMARC), then we can safely turn this to true, to align with
+# what Fedora ships as default.
+SPFIgnoreResults false
 
 ##  SPFSelfValidate { true | false }
 ##	default false
