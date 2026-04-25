@@ -739,7 +739,7 @@ mailbox_size_limit = {{ mailbox_size_limit }}
 virtual_alias_domains = {{ destination_domains | join(", ") }}
 virtual_alias_maps = hash:/etc/postfix/virtual
 
-smtpd_milters = unix:/var/spool/opendkim/socket/opendkim.sock
-non_smtpd_milters = unix:/var/spool/opendkim/socket/opendkim.sock
+smtpd_milters = unix:/var/spool/opendkim/socket/opendkim.sock, unix:/run/opendmarc/opendmarc.sock
+non_smtpd_milters = unix:/var/spool/opendkim/socket/opendkim.sock, unix:/run/opendmarc/opendmarc.sock
 
 internal_mail_filter_classes = bounce

@@ -8,6 +8,8 @@ with:
   servers which fail SPF checks — only headers are attached to incoming mail)
 * DKIM (on by default, but no rejection of improperly-signed e-mail —
   only headers are attached to incoming mail)
+* DMARC (on by default, but no rejection of improperly-sent e-mail) —
+  see below for how to configure DMARC DNS records
 
 You can adjust all these services using pillar settings (detailed below).
 That said, the settings to make SPF and DKIM *reject* mail don't seem to
@@ -291,6 +293,45 @@ See file [spf/policyd-spf.conf.j2] and documentation for python-policyd-spf for 
 A list of domains to skip SPF checks for, based on DNS PTR record match.  Empty by default.
 
 See file [spf/policyd-spf.conf.j2] and documentation for python-policyd-spf for information.
+
+### `dmarc`
+
+There are currently no configuration options for DMARC, but you need
+to add records to the domains you will be sending and receving e-mail
+from.  From
+[the helpful ArchLinux guide](https://wiki.archlinux.org/title/OpenDMARC#DMARC_Record):
+
+First for testing cautiously without harming your e-mail deliverability
+(as (sub)policy is "none"); this instructs mail servers to send aggregated
+reports and failing reports (SPF and DKIM).
+The following example DNS record is in `named` (BIND) format:
+
+```
+_dmarc.example.com. IN TXT "v=DMARC1; p=none; rua=mailto:postmaster@example.com; ruf=mailto:postmaster.forensic@example.com; adkim=s; fo=1"
+```
+
+The e-mail addresses included in the record should be valid mailboxes.
+
+After a certain time of analyzing received reports you can enable the
+policy, for example, for 10% of e-mail traffic.
+
+```
+_dmarc.example.com. IN TXT "v=DMARC1; p=quarantine; rua=mailto:postmaster@example.com; ruf=mailto:forensic@example.com; adkim=s; fo=1; pct=10"
+```
+
+Then slowly raise the percentage and finalize with policy 100%
+enabled and only failing reports:
+
+```
+_dmarc.example.com IN TXT "v=DMARC1; p=quarantine; ruf=mailto:forensic@example.com; adkim=s; fo=1"
+```
+
+A [reference for DMARC records can be found here](https://mxtoolbox.com/dmarc/details/what-is-a-dmarc-record).
+Another [good reference can be found here](https://www.sidn.nl/en/news-and-blogs/hands-on-implementing-spf-dkim-and-dmarc-in-postfix).
+
+Note that, for DMARC to work properly, you should have a proper
+SPF record covering the domains you send from and the mail server
+you're sending e-mail from for those domains.
 
 ### `suppress_unresolvable_hostname_warning_logs`
 

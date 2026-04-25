@@ -22,6 +22,9 @@ defaults = {
         "dkim": {
             "MinimumKeyBits": 2048,
         },
+        "dmarc": {
+            "IgnoreAuthenticatedClients": True,
+        },
         "spf": {
             "HELO_reject": "Fail",
             "Mail_From_reject": "Fail",
